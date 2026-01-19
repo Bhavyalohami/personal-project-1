@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+      
+        .email-container {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border: 2px solid black; 
+            border-radius: 8px; 
+        }
+       
+        .email-header {
+            background-color: #e0f7fa; 
+            padding: 10px; 
+            text-align : left;
+        }
+        .email-footer {
+            {% comment %} display: flex;
+            
+            justify-content: space-between;
+            align-items: center; {% endcomment %}
+            background-color: #e0f7fa; 
+            padding: 10px; 
+            width:100%;
+            display:inline-block;
+        }
+        .email-header img {
+            max-width: 200px;
+            display: block;
+            margin-right: 20px;
+        }
+        .email-footer img {
+            max-width: 200px;
+            float: right;
+            margin-right: 20px;
+        }
+        .email-body {
+            margin-top: 20px;
+        }
+        .email-footer p{
+            display:inline-block;
+        }
+    </style>
+    {% load static %}
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <img src="cid:logo" alt="Website Logo">
+        </div>
+        <div class="email-body">
+            <p>Dear Dr. {{ booking.doctor }},</p>
+            <p>This is to inform you that a new appointment has been booked.</p>
+            <p><strong>Date:</strong> {{ booking.date }}</p>
+            <p><strong>Time:</strong> {{ booking.time }}</p>
+            <p><strong>Patient Name:</strong> {{ booking.name }}</p>
+            <p>Please ensure that you are prepared for the appointment. If you need to reschedule, kindly contact the patient directly or use the admin panel.</p>
+            <p>Thank you for your commitment to providing excellent care.</p>
+            <p>Best regards,<br>Dr. Consultation Team</p>
+            <hr>
+            <p><em>This is an automated message. Please do not reply to this email.</em></p>
+        </div>
+        <div class="email-footer">
+            <p>&copy; {{ current_year }} Dr. Consultation. All rights reserved.</p>
+            <img src="cid:logo" alt="Website Logo">
+        </div>
+    </div>
+</body>
+</html>

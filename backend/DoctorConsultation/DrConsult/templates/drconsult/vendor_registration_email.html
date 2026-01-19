@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+      
+        .email-container {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border: 2px solid black; 
+            border-radius: 8px; 
+        }
+       
+        .email-header {
+            background-color: #e0f7fa; 
+            padding: 10px; 
+            text-align : left;
+        }
+        .email-footer {
+            {% comment %} display: flex;
+            
+            justify-content: space-between;
+            align-items: center; {% endcomment %}
+            background-color: #e0f7fa; 
+            padding: 10px; 
+            width:100%;
+            display:inline-block;
+        }
+        .email-header img {
+            max-width: 200px;
+            display: block;
+            margin-right: 20px;
+        }
+        .email-footer img {
+            max-width: 200px;
+            float: right;
+            margin-right: 20px;
+        }
+        .email-body {
+            margin-top: 20px;
+        }
+        .email-footer p{
+            display:inline-block;
+        }
+    </style>
+    {% load static %}
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <img src="cid:logo" alt="Website Logo">
+        </div>
+        <div class="email-body">
+            <p>Dear {{ first_name }},</p>
+            
+            <p>Welcome to the Doctor Consultation Platform! We are pleased to inform you that your account has been successfully registered.</p>
+        
+            <p><strong>Your Login Details:</strong></p>
+            <p><strong>Username:</strong> {{ username }}</p>
+            <p><strong>Password:</strong> {{ password }}</p>
+            
+            <p>To complete your registration, please activate your account by clicking the activation link below:</p>
+            <p><a href={{activation_link}}>Activate Your Account</a></p>
+            
+            <br>
+        
+            <p><strong>Next Steps:</strong></p>
+            <ol>
+                <li><strong>Change Your Password:</strong> For your security, we recommend changing your password immediately after your first login.</li>
+                <li><strong>Log in to Your Account:</strong> Use the above credentials to log in.</li>
+                <li><strong>Update Profile:</strong> Visit the "My Profile" section to review and update your details.</li>
+            </ol>
+        
+            <p>If you did not register for an account, please disregard this email.</p>
+        
+            <br>
+        
+            <p>Best regards,<br>The Doctor Consultation Team</p>
+            
+            <p><em>This is an automated message. Please do not reply.</em></p>
+        </div>
+        
+        <div class="email-footer">
+            <p>&copy; {{ current_year }} Dr. Consultation. All rights reserved.</p>
+            <img src="cid:logo" alt="Website Logo">
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+
+      .email-container {
+          font-family: Arial, sans-serif;
+          padding: 20px;
+          background-color: #f4f4f4;
+          border: 2px solid black;
+          border-radius: 8px;
+      }
+
+      .email-header {
+          background-color: #e0f7fa;
+          padding: 10px;
+          text-align : left;
+      }
+      .email-footer {
+          {% comment %} display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background-color: #e0f7fa;
+          padding: 10px;  {% endcomment %}
+          background-color: #e0f7fa;
+          padding: 10px;
+          width:100%;
+          display:inline-block;
+      }
+      .email-header img {
+          max-width: 200px;
+          display: inline-block;
+          margin-right: 20px;
+      }
+      .email-footer img {
+          max-width: 200px;
+          float: right;
+          margin-right: 20px;
+      }
+      .email-body {
+          margin-top: 20px;
+      }
+      .email-footer p{
+          padding-top:10px;
+          display:inline-block;
+      }
+    </style>
+    {% load static%}
+  </head>
+  <body>
+    <div class="email-container">
+      <div class="email-header">
+        <img src="cid:logo" alt="Website Logo" />
+      </div>
+      <div class="email-body">
+        <p>Dear {{ booking.name }},</p>
+        <p>
+          Thank you for reaching out to [Clinic Name]. We have successfully
+          received your consultation request and our team will get back to you
+          shortly.
+        </p>
+        
+        <p>
+          If you have any questions or need further assistance in the meantime,
+          please feel free to contact us at [Phone Number] or via email at
+          [Email Address].
+        </p>
+        
+        <p>We appreciate your patience and look forward to assisting you.</p>
+       
+        
+        <p>Best regards,<br />Dr. Consultation</p>
+        <p>8546525146</p>
+        <p>info@doctorconsultation.com</p>
+        
+        <hr />
+        <p>
+          <em
+            >This is an automated message. Please do not reply to this
+            email.</em
+          >
+        </p>
+      </div>
+      <div class="email-footer">
+        <p>
+          Copyright &copy; {{ current_year }} Dr. Consultation. All rights
+          reserved.
+        </p>
+
+        <img src="cid:logo" alt="Website Logo" />
+      </div>
+    </div>
+  </body>
+</html>

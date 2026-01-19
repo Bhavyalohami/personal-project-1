@@ -1,0 +1,226 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@layer utilities {
+  .servicespng::before {
+    z-index: 0;
+    position: absolute;
+  }
+
+  /* .rc-anchor-container {
+    transform: scale(0.2);
+    -webkit-transform: scale(0.8);
+    transform-origin: 0 0;
+    -webkit-transform-origin: 0 0;
+  } */
+
+  .sec_button::before {
+    position: absolute;
+    right: -23px;
+    top: -29px;
+    content: "";
+    background-image: url(/public/assets/Home/Section1/button.png);
+    /* background-color: black; */
+    width: 115px;
+    height: 115px;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .sec_button:hover:before {
+    opacity: 100;
+  }
+
+  @media (max-width: 440px) and (min-width: 400px) {
+    .sec_block_1 {
+      width: 220px;
+      line-height: 1;
+      font-weight: 900;
+      font-size: 25px;
+      padding-top: 20px;
+    }
+
+    .sec_block_2 {
+      width: 150px;
+      font-size: 8px;
+      padding-top: 8px;
+      line-height: 1;
+    }
+
+    .sec_block_3 {
+      padding-top: 2px;
+      padding-bottom: 2px;
+    }
+
+    .sec_block_3_1 {
+      font-size: 10px;
+      font-size: 10px;
+      padding-top: 4px;
+      padding-bottom: 4px;
+      padding-left: 6px;
+      padding-right: 6px;
+    }
+
+    .sec_block_3_2 {
+      height: 8px;
+      width: 16px;
+      margin-left: 8px;
+    }
+
+    .sectionarrow {
+      height: 1rem;
+      width: 1rem;
+    }
+  }
+
+  /* @media (max-width: 500px) and (min-width: 440px){
+        .sec_block_1{
+        width: 220px;
+        line-height: 1;
+        font-weight: 900;
+        font-size: 25px; 
+        padding-top: 20px;
+        }
+        
+        .sec_block_2{
+          width: 150px;
+          font-size: 8px;
+          padding-top: 8px;
+          line-height: 1;
+        }
+        .sec_block_3{
+          padding-top: 2px;
+        }
+        .sec_block_3_1{
+          font-size: 10px;
+          font-size: 10px;
+          padding-top: 4px; 
+          padding-bottom: 4px;
+          padding-left: 6px;
+          padding-right: 6px;
+        }
+        .sec_block_3_2{
+          height: 8px; 
+          width: 16px; 
+          margin-left: 8px;
+        }
+      } */
+
+  @media (max-width: 768px) {
+    .sec_button::before {
+      background-image: none;
+      /* Remove background image */
+      width: 0;
+      /* Optional: Set width to 0 to ensure no visible space */
+      height: 0;
+      /* Optional: Set height to 0 to ensure no visible space */
+    }
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .loader {
+    border: 12px solid rgba(0, 0, 0, 0.1);
+    border-radius: 100%;
+    border-top: 4px solid #0f6ba8; /* Change color as needed */
+    width: 80px; /* Adjust size as needed */
+    height: 80px; /* Adjust size as needed */
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes moveAround {
+    0% {
+      transform: translate(-30px, 0);
+    }
+    25% {
+      transform: translate(-10px, -50px);
+    }
+    50% {
+      transform: translate(-20px, 0);
+    }
+    75% {
+      transform: translate(-10px, -50px);
+    }
+    100% {
+      transform: translate(-30px, 0);
+    }
+  }
+
+  .loading {
+    display: inline-block;
+    animation: moveAround 5s infinite;
+    margin-top: -100px;
+  }
+
+  svg polyline {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  #back {
+    stroke: rgba(16, 48, 164, 0.5); /* Adjusted to valid rgba color */
+  }
+
+  #front {
+    stroke: #1030a4;
+    stroke-dasharray: 12, 36; /* Dash 12 & Gap 36 */
+    stroke-dashoffset: 48;
+    animation: dash 1s linear infinite;
+  }
+
+  @keyframes dash {
+    62.5% {
+      opacity: 0;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .accordion-button:not(.collapsed) {
+    box-shadow: none;
+  }
+
+  .scrollable {
+    max-height: 480px;
+    overflow-y: auto;
+  }
+
+  .scrollable::-webkit-scrollbar {
+    width: 12px;
+  }
+
+  .scrollable::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollable::-webkit-scrollbar-thumb {
+    background-color: #afacac;
+    border-radius: 6px;
+  }
+
+  .scrollable::-webkit-scrollbar-thumb:hover {
+    background-color: #666;
+  }
+
+  .scrollable::-webkit-scrollbar-button {
+    display: none;
+  }
+
+  .scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: #888 transparent;
+  }
+}
+
+.MuiButtonBase-root {
+  padding: 0 !important;
+  margin-right: -4px !important;
+}
