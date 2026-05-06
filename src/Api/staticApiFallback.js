@@ -632,7 +632,7 @@ const hospitalProfile = (hospitalId) => {
     hospital.id === "default-hospital",
   );
   return {
-    ...hospital,
+    hospital,
     media: hospitalMedia[hospital.id] || [],
     services,
     doctors: hospitalDoctors,
