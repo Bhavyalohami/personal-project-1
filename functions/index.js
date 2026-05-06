@@ -115,6 +115,12 @@ const DEFAULT_PERMISSIONS = HMS_MODULES.flatMap((module) =>
 );
 
 app.use(cors({origin: true}));
+app.use((req, res, next) => {
+  if (req.url === "/api" || req.url.startsWith("/api/")) {
+    req.url = req.url.replace(/^\/api(?=\/|$)/, "") || "/";
+  }
+  next();
+});
 app.use(express.json({limit: "15mb"}));
 app.use(express.urlencoded({extended: true, limit: "15mb"}));
 
