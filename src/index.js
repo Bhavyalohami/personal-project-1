@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, HashRouter } from "react-router-dom";
 import { SnackbarProvider } from 'notistack';
 // const script = document.createElement('script');
 // script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_API_KEY}&libraries=places`;
@@ -28,6 +28,9 @@ const routerBasename =
   publicPathname && window.location.pathname.startsWith(publicPathname)
     ? publicPathname
     : undefined;
+const isGitHubPages = window.location.hostname.endsWith("github.io");
+const Router = isGitHubPages ? HashRouter : BrowserRouter;
+const routerProps = isGitHubPages ? {} : { basename: routerBasename };
 
 const normalizePublicAssetImages = () => {
   if (!publicPathname) return;
@@ -48,8 +51,8 @@ new MutationObserver(normalizePublicAssetImages).observe(document.documentElemen
 
 root.render(
   <SnackbarProvider maxSnack={4}>
-    <BrowserRouter basename={routerBasename}>
+    <Router {...routerProps}>
       <App />
-    </BrowserRouter>
+    </Router>
   </SnackbarProvider>
 );
