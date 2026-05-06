@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkdoctor_consultation=self.webpackChunkdoctor_consultation||[]).push([[9497],{69497:(s,l,c)=>{c.r(l),c.d(l,{default:()=>e});c(65043);var a=c(70579);const e=()=>(0,a.jsx)("div",{className:"py-8 px-8 bg-[#F2F2F2] w-full",children:(0,a.jsx)("div",{className:"w-full min-h-screen container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48 pb-8"})})}}]);
+//# sourceMappingURL=9497.0e8f6048.chunk.js.map

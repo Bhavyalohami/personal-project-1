@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkdoctor_consultation=self.webpackChunkdoctor_consultation||[]).push([[2357],{42357:(t,o,s)=>{s.r(o),s.d(o,{default:()=>n});var c=s(9886),e=s(70579);const n=()=>(0,e.jsx)(c.A,{role:"patient"})}}]);
+//# sourceMappingURL=2357.35b618e0.chunk.js.map
