@@ -34,6 +34,40 @@ const isGitHubPages = window.location.hostname.endsWith("github.io");
 const Router = isGitHubPages ? HashRouter : BrowserRouter;
 const routerProps = isGitHubPages ? {} : { basename: routerBasename };
 
+const withPublicAssetPath = (src) => {
+  if (!publicPathname || typeof src !== "string" || !src.startsWith("/brand/")) {
+    return src;
+  }
+  return src.startsWith(`${publicPathname}/`) ? src : `${publicPathname}${src}`;
+};
+
+const patchImageAssetSetters = () => {
+  if (!publicPathname || window.__carebridgeImageAssetPatchInstalled) return;
+  window.__carebridgeImageAssetPatchInstalled = true;
+
+  const srcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+  if (srcDescriptor?.set && srcDescriptor?.get) {
+    Object.defineProperty(HTMLImageElement.prototype, "src", {
+      configurable: true,
+      enumerable: srcDescriptor.enumerable,
+      get() {
+        return srcDescriptor.get.call(this);
+      },
+      set(value) {
+        srcDescriptor.set.call(this, withPublicAssetPath(value));
+      },
+    });
+  }
+
+  const originalSetAttribute = Element.prototype.setAttribute;
+  Element.prototype.setAttribute = function patchedSetAttribute(name, value) {
+    if (this instanceof HTMLImageElement && String(name).toLowerCase() === "src") {
+      return originalSetAttribute.call(this, name, withPublicAssetPath(String(value)));
+    }
+    return originalSetAttribute.call(this, name, value);
+  };
+};
+
 const normalizePublicAssetImages = () => {
   if (!publicPathname) return;
 
@@ -45,6 +79,7 @@ const normalizePublicAssetImages = () => {
   });
 };
 
+patchImageAssetSetters();
 normalizePublicAssetImages();
 new MutationObserver(normalizePublicAssetImages).observe(document.documentElement, {
   childList: true,
