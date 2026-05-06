@@ -499,6 +499,42 @@ const storeKey = (name) => `carebridge-static-api-${name}`;
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const pad = (value) => String(value).padStart(2, "0");
 
+const getPublicPathname = () => {
+  const publicUrl = process.env.PUBLIC_URL || "";
+  if (publicUrl) {
+    try {
+      return new URL(publicUrl).pathname.replace(/\/$/, "");
+    } catch (error) {
+      return publicUrl.replace(/\/$/, "");
+    }
+  }
+
+  if (typeof window !== "undefined" && window.location.hostname.endsWith("github.io")) {
+    const [repoName] = window.location.pathname.split("/").filter(Boolean);
+    return repoName ? `/${repoName}` : "";
+  }
+
+  return "";
+};
+
+const withPublicAssetPath = (value) => {
+  if (typeof value !== "string" || !value.startsWith("/brand/")) return value;
+  const publicPathname = getPublicPathname();
+  if (!publicPathname || value.startsWith(`${publicPathname}/`)) return value;
+  return `${publicPathname}${value}`;
+};
+
+const normalizeAssetPaths = (value) => {
+  if (typeof value === "string") return withPublicAssetPath(value);
+  if (Array.isArray(value)) return value.map(normalizeAssetPaths);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entryValue]) => [key, normalizeAssetPaths(entryValue)]),
+    );
+  }
+  return value;
+};
+
 const readStore = (name, seed) => {
   if (typeof window === "undefined") return clone(seed);
   try {
@@ -604,7 +640,7 @@ const hospitalProfile = (hospitalId) => {
   };
 };
 
-const staticResponse = (data, status = 200) => ({ data: clone(data), status });
+const staticResponse = (data, status = 200) => ({ data: normalizeAssetPaths(clone(data)), status });
 
 const parseUrl = (config) => {
   if (typeof window === "undefined") return null;
