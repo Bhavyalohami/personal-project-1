@@ -38,9 +38,6 @@ jobs:
           REACT_APP_API_BASE_URL: https://asia-south1-clinic-appointment-booki-15481.cloudfunctions.net/api/
         run: npm run build
 
-      - name: Add SPA fallback
-        run: cp build/index.html build/404.html
-
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
