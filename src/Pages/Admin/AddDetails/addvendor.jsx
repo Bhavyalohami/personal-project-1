@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -111,12 +111,10 @@ const AddVendor = () => {
     const apiUrl = `${BaseUrl}clinic/register-vendor/`;
     const token = Cookies.get("token");
 
-    const { password, confirmpassword, ...vendorData } = formData;
-
     try {
       setLoading(true);
       window.scrollTo(0, 0);
-      const response = await axios.post(apiUrl, formData, {
+      await axios.post(apiUrl, formData, {
         headers: {
           Authorization: `Token ${token}`,
           "Content-Type": "application/json",
@@ -153,7 +151,7 @@ const AddVendor = () => {
   return (
     <>
       {!loading ? (
-        <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+        <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
           <AdminSearch />
           <div role="presentation" onClick={handleBreadClick} className="ml-1">
             <Breadcrumbs separator="›" aria-label="breadcrumb">
@@ -176,11 +174,11 @@ const AddVendor = () => {
               </Link>
             </Breadcrumbs>
           </div>
-          <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+          <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
             <div className="flex items-center justify-between">
-              <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+              <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
                 Add Vendor
-              </text>
+              </span>
             </div>
             <div>
               <form id="AddVendor" onSubmit={handleSubmit}>

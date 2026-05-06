@@ -28,7 +28,12 @@ const MyProfile = () => {
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
-  const [apiUrl, setApiUrl] = useState(false);
+  const fallbackName =
+    [data.fname, data.lname].filter(Boolean).join(" ") ||
+    Cookies.get("username") ||
+    "Doctor";
+  const fallbackRole =
+    data.role || (isStaff && !isVendor ? "Doctor" : isVendor ? "Clinic Vendor" : "Care Team");
 
   useEffect(() => {
     const Suser = Cookies.get("is_superuser");
@@ -53,6 +58,7 @@ const MyProfile = () => {
       const url = `${BaseUrl}clinic/staff-list/${user}`;
       fetchData(url);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async (apiUrl) => {
@@ -145,15 +151,15 @@ const MyProfile = () => {
             <div className="flex items-center w-full">
               <img
                 className="mr-5 h-24 w-24 rounded-full object-cover"
-                src={data.image}
+                src={data.image || "/brand/doctor-avatar-teal.png"}
                 alt="Profile"
               />
               <div className="flex flex-col w-full">
                 <p className="font-nunito text-[22px] lg:text-[32px] font-bold leading-[43.65px] tracking-[-0.114px]">
-                  {data.fname} {data.lname}
+                  {fallbackName}
                 </p>
                 <p className="font-nunito text-[#113C54] text-[18px] lg:text-[28px] font-bold leading-[43.65px] tracking-[-0.114px]">
-                  {data.role}
+                  {fallbackRole}
                 </p>
               </div>
               {/* <div className="flex flex-col w-full h-full items-end justify-start">
@@ -198,7 +204,7 @@ const MyProfile = () => {
                   Phone
                 </p>
                 <p className="font-open-sans text-[18px] font-normal leading-[24.51px] tracking-[-0.114px] mt-1">
-                  +91 {data.phone}
+                  {data.phone ? `+91 ${data.phone}` : "Not added"}
                 </p>
               </div>
             </div>

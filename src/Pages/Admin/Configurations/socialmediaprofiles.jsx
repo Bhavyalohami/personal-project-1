@@ -25,13 +25,20 @@ const SocialMediaProfiles = () => {
     facebook_url: "",
     instagram_url: "",
     twitter_url: "",
-    linkedinurl: "",
+    linkedin_url: "",
   };
 
   const getData = async () => {
     try {
       const response = await axios.get(`${BaseUrl}clinic/socialmediaprofile/`);
-      setFormData(response.data);
+      const data = response.data || {};
+      setFormData((current) => ({
+        ...current,
+        facebook_url: data.facebook_url ?? "",
+        twitter_url: data.twitter_url ?? "",
+        instagram_url: data.instagram_url ?? "",
+        linkedin_url: data.linkedin_url ?? "",
+      }));
     } catch (error) {
       console.error(error);
       if (error.code === "ERR_BAD_REQUEST") {
@@ -62,6 +69,7 @@ const SocialMediaProfiles = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     setIsStaff(Cookies.get("is_staff") === "true");
     getData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [formErrors, setFormErrors] = useState(initialFormErrors);
@@ -135,7 +143,7 @@ const SocialMediaProfiles = () => {
           cancelButtonText: "No",
         });
         if (confirmationResult.isConfirmed) {
-          const response = await axios.put(
+          await axios.put(
             `${BaseUrl}clinic/socialmediaprofile/`,
             formData,
             {
@@ -164,7 +172,7 @@ const SocialMediaProfiles = () => {
   }
 
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+    <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
       {isSuperuser ? (
         <AdminSearch />
       ) : isVendor && !isStaff ? (
@@ -190,11 +198,11 @@ const SocialMediaProfiles = () => {
         </Breadcrumbs>
       </div>
 
-      <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+      <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Social Media Profiles
-          </text>
+          </span>
         </div>
         <div>
           <form id="Update Links" onSubmit={handleSubmit}>
@@ -214,7 +222,7 @@ const SocialMediaProfiles = () => {
                         id="facebook"
                         name="facebook_url"
                         type="text"
-                        value={formData.facebook_url}
+                        value={formData.facebook_url || ""}
                         placeholder="Please enter facebook url"
                         onChange={handleChange}
                         autoComplete="family-name"
@@ -238,7 +246,7 @@ const SocialMediaProfiles = () => {
                       <input
                         id="instagram"
                         name="instagram_url"
-                        value={formData.instagram_url}
+                        value={formData.instagram_url || ""}
                         placeholder="Please enter instagram url"
                         onChange={handleChange}
                         rows={4}
@@ -261,7 +269,7 @@ const SocialMediaProfiles = () => {
                       <input
                         id="twitter"
                         name="twitter_url"
-                        value={formData.twitter_url}
+                        value={formData.twitter_url || ""}
                         placeholder="Please enter twitter url"
                         onChange={handleChange}
                         rows={4}
@@ -284,7 +292,7 @@ const SocialMediaProfiles = () => {
                       <input
                         id="linkedin"
                         name="linkedin_url"
-                        value={formData.linkedin_url}
+                        value={formData.linkedin_url || ""}
                         placeholder="Please enter linkedin url"
                         onChange={handleChange}
                         rows={4}

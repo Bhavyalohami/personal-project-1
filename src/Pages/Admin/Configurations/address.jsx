@@ -31,7 +31,14 @@ const Address = () => {
   const getData = async () => {
     try {
       const response = await axios.get(`${BaseUrl}clinic/address/`);
-      setFormData(response.data);
+      const data = response.data || {};
+      setFormData((current) => ({
+        ...current,
+        email_address: data.email_address ?? "",
+        address: data.address ?? "",
+        contact_number: data.contact_number ?? "",
+        company_name: data.company_name ?? "",
+      }));
     } catch (error) {
       if (error.code === "ERR_BAD_REQUEST") {
         Swal.fire({
@@ -62,6 +69,7 @@ const Address = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     setIsStaff(Cookies.get("is_staff") === "true");
     getData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e) => {
@@ -125,7 +133,7 @@ const Address = () => {
           cancelButtonText: "No",
         });
         if (confirmationResult.isConfirmed) {
-          const response = await axios.put(
+          await axios.put(
             `${BaseUrl}clinic/address/`,
             formData,
             {
@@ -152,7 +160,7 @@ const Address = () => {
     console.info("You clicked a breadcrumb.");
   }
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+    <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
        {isSuperuser ? (
         <AdminSearch />
       ) : isVendor && !isStaff ? (
@@ -177,11 +185,11 @@ const Address = () => {
         </Breadcrumbs>
       </div>
 
-      <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+      <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Update Address
-          </text>
+          </span>
         </div>
         <div>
           <form id="Update Links" onSubmit={handleSubmit}>
@@ -201,7 +209,7 @@ const Address = () => {
                         id="companyname"
                         name="company_name"
                         type="text"
-                        value={formData.company_name}
+                        value={formData.company_name || ""}
                         placeholder="Please enter company name"
                         onChange={handleChange}
                         autoComplete="family-name"
@@ -225,7 +233,7 @@ const Address = () => {
                       <input
                         id="contactno"
                         name="contact_number"
-                        value={formData.contact_number}
+                        value={formData.contact_number || ""}
                         placeholder="Please enter contact number"
                         onChange={handleChange}
                         className="block w-full rounded-md border-0 pl-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
@@ -247,7 +255,7 @@ const Address = () => {
                       <input
                         id="emailaddress"
                         name="email_address"
-                        value={formData.email_address}
+                        value={formData.email_address || ""}
                         placeholder="Please enter email"
                         onChange={handleChange}
                         className="block w-full rounded-md border-0 pl-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
@@ -269,7 +277,7 @@ const Address = () => {
                       <input
                         id="address"
                         name="address"
-                        value={formData.address}
+                        value={formData.address || ""}
                         placeholder="Please enter address"
                         onChange={handleChange}
                         className="block w-full rounded-md border-0 pl-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import ReCAPTCHA from "react-google-recaptcha";
 import Cookies from "js-cookie";
-import { RiArrowDownSLine } from "react-icons/ri";
 const GetDetails = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const recaptchaSiteKey = process.env.REACT_APP_RECAPTCHA_SITE_KEY;
+  const captchaEnabled = Boolean(recaptchaSiteKey);
+  const hospitalIdFromUrl = searchParams.get("hospitalId") || "";
 
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
   const [formData, setFormData] = useState({
@@ -34,22 +37,6 @@ const GetDetails = () => {
     "Over 65",
   ];
 
-  const getModalInfo = () => {
-    if (
-      formErrors.name ||
-      formErrors.age ||
-      formErrors.phone ||
-      formErrors.email ||
-      formErrors.city ||
-      formErrors.gender ||
-      formErrors.message
-    ) {
-      return false;
-    } else {
-      return true;
-    }
-  };
-
   useEffect(() => {
     const storedData = localStorage.getItem("formData");
     if (storedData) {
@@ -57,10 +44,10 @@ const GetDetails = () => {
     }
   }, []);
 
-  const handleCaptchaChange = (value) => {
+  const handleCaptchaChange = () => {
     const captchaError = document.getElementById("recaptcha-error");
     setIsCaptchaVerified(true);
-    captchaError.textContent = "";
+    if (captchaError) captchaError.textContent = "";
   };
 
   const handleChange = (e) => {
@@ -133,29 +120,27 @@ const GetDetails = () => {
     return isValid;
   };
 
-  const [empty, setEmpty] = useState(false);
-
   const handleSubmit = (e) => {
+    e?.preventDefault?.();
     Cookies.set("name", formData.name);
-    const captcha = document.getElementById("recaptcha").value;
     const captchaError = document.getElementById("recaptcha-error");
-    captchaError.textContent = "";
-    if (!isCaptchaVerified) {
-      captchaError.textContent = "Please check the box to proceed";
+    if (captchaError) captchaError.textContent = "";
+    if (captchaEnabled && !isCaptchaVerified) {
+      if (captchaError) {
+        captchaError.textContent = "Please check the box to proceed";
+      }
     }
-    // e.preventDefault();
-
     const isValid = validateForm();
 
-    setEmpty(false);
-
-    if (isValid && isCaptchaVerified === true) {
+    if (isValid && (!captchaEnabled || isCaptchaVerified === true)) {
       Cookies.set("name", formData.name);
       localStorage.setItem("formData", JSON.stringify(formData));
 
-      setEmpty(true);
-
-      navigate("/booking"); // Navigate to booking page
+      navigate(
+        hospitalIdFromUrl
+          ? `/booking?hospitalId=${encodeURIComponent(hospitalIdFromUrl)}`
+          : "/booking"
+      ); // Navigate to booking page
       // window.location.reload();
 
       //   setModalOpen(false); // Close the modal
@@ -176,7 +161,7 @@ const GetDetails = () => {
     // console.log("After reset:", formData); // Check state after reset
     // setFormErrors(initialFormErrors); // Clear form errors
     const captchaError = document.getElementById("recaptcha-error");
-    captchaError.textContent = "";
+    if (captchaError) captchaError.textContent = "";
     setFormErrors("");
     setFormData({
       name: "",
@@ -192,7 +177,7 @@ const GetDetails = () => {
       <div className="bg-[#F2EFEA] pt-6">
         <div className="container grid grid-cols-2 mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
           <div className="flex flex-col justify-center items-start">
-            <img src="/assets/Mainabout.png" alt="" />
+            <img src="/brand/hero-care-teal.png" alt="" />
           </div>
           <div className="flex flex-col justify-center items-end text-black font-black text-lg sm:text-xl md:text-3xl lg:text-7xl">
             Enter Details
@@ -242,7 +227,7 @@ const GetDetails = () => {
                     value=""
                     className="text-sm font-medium border-gray-300 "
                   >
-                    Select Age<span className="text-red-600">*</span>
+                    Select Age *
                   </option>
                   {ageOptions.map((option) => (
                     <option
@@ -349,24 +334,26 @@ const GetDetails = () => {
               </div>
             </div>
 
-            <div className=" ml-0.5">
-              <div className="scale-[0.8] flex flex-col ml-[-40px] md:ml-[-70px] lg:ml-[-50px] xl:ml-[-70px] 2xl:ml-[-85px] mt-3 flex items-start w-full">
-                <ReCAPTCHA
-                  sitekey="6Lc4RyEqAAAAAKpyye27qavRHxgswURGIuebcTmE"
-                  onChange={handleCaptchaChange}
-                  id="recaptcha"
-                />
-                <span
-                  className="text-red-500 font-medium text-[17px] mt-1"
-                  id="recaptcha-error"
-                ></span>
+            {captchaEnabled && (
+              <div className=" ml-0.5">
+                <div className="scale-[0.8] flex flex-col ml-[-40px] md:ml-[-70px] lg:ml-[-50px] xl:ml-[-70px] 2xl:ml-[-85px] mt-3 flex items-start w-full">
+                  <ReCAPTCHA
+                    sitekey={recaptchaSiteKey}
+                    onChange={handleCaptchaChange}
+                    id="recaptcha"
+                  />
+                  <span
+                    className="text-red-500 font-medium text-[17px] mt-1"
+                    id="recaptcha-error"
+                  ></span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
           <div className="w-full  lg:w-2/5">
             <img
               className="w-full h-5/6"
-              src="/assets/Booking/book2.jpg"
+              src="/brand/hero-care-teal.png"
               alt="Booking"
             />
           </div>
@@ -374,14 +361,14 @@ const GetDetails = () => {
         <div className="flex w-full gap-8 mb-4 items-center justify-center container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
           <button
             type="submit"
-            className="w-1/5 h-[60px] bg-[#F16163] text-[#ffffff] rounded-[20px] flex items-center justify-center font-inter text-[12px] md:text-[28px] font-medium leading-8 hover:bg-red-600"
-            onClick={() => handleSubmit()}
+            className="w-1/5 h-[60px] bg-[#0D9488] text-[#ffffff] rounded-[20px] flex items-center justify-center font-inter text-[12px] md:text-[28px] font-medium leading-8 hover:bg-red-600"
+            onClick={handleSubmit}
           >
             Continue
           </button>
           <button
             type="reset"
-            className="w-1/5 h-[60px] bg-[#1030A4] text-[#ffffff] rounded-[20px] flex items-center justify-center font-inter text-[12px] md:text-[28px] font-medium leading-8 hover:bg-blue-700"
+            className="w-1/5 h-[60px] bg-[#0D9488] text-[#ffffff] rounded-[20px] flex items-center justify-center font-inter text-[12px] md:text-[28px] font-medium leading-8 hover:bg-blue-700"
             onClick={() => handleReset()}
           >
             Reset

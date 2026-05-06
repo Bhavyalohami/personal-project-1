@@ -1,15 +1,8 @@
+import ModernDataGrid, { ModernDataGridToolbar } from "../../Component/Table/ModernDataGrid";
 import AdminSearch from "../../Component/Admin/adminsearch";
 import DoctorSearch from "../../Component/Doctor/doctorsearch";
 import VendorSearch from "../../Component/Vendor/vendorsearch";
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import Box from "@mui/material/Box";
-import {
-  DataGrid,
-  GridToolbarContainer,
-  GridToolbarQuickFilter,
-} from "@mui/x-data-grid";
-import { styled } from "@mui/material/styles";
+import React, { useEffect, useState } from "react";
 import { MdEdit } from "react-icons/md";
 import axios from "axios";
 import Cookies from "js-cookie";
@@ -18,27 +11,11 @@ import Swal from "sweetalert2";
 import Tooltip from "@mui/material/Tooltip";
 import parse from "html-react-parser";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
+import { Link, useNavigate } from "react-router-dom";
 
-const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
-  "& .MuiDataGrid-root": {
-    border: "none",
-  },
-  "& .MuiDataGrid-cell": {
-    borderBottom: "1px solid #e0e0e0",
-  },
-  "& .MuiDataGrid-columnHeaders": {
-    backgroundColor: "#f5f5f5",
-  },
-  "& .MuiDataGrid-footerContainer": {
-    borderTop: "1px solid #e0e0e0",
-  },
-}));
+const StyledDataGrid = ModernDataGrid;
 
-const CustomToolbar = () => (
-  <GridToolbarContainer>
-    <GridToolbarQuickFilter className="pt-2 min-w-[320px]" />
-  </GridToolbarContainer>
-);
+const CustomToolbar = ModernDataGridToolbar;
 
 const ManageContent = () => {
   const navigate = useNavigate();
@@ -108,6 +85,7 @@ const ManageContent = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     getData();
     handleSubRoles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Column definitions outside of useMemo
@@ -180,13 +158,13 @@ const ManageContent = () => {
       </div>
       <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Manage Content
-          </text>
+          </span>
         </div>
 
         <div className="bg-white">
-          <Box sx={{ width: 1 }}>
+          <div className="w-full">
             <StyledDataGrid
               rows={rows}
               columns={columns}
@@ -196,7 +174,7 @@ const ManageContent = () => {
               }}
               pageSizeOptions={[5, 10, 25]}
             />
-          </Box>
+          </div>
         </div>
       </div>
     </div>

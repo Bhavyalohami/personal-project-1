@@ -26,18 +26,6 @@ const LogoChange = () => {
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-    setFormErrors({
-      ...formErrors,
-      [name]: "",
-    });
-  };
-
   const validateForm = () => {
     let isValid = true;
     const errors = { ...formErrors };
@@ -69,7 +57,7 @@ const LogoChange = () => {
           const formData = new FormData();
           formData.append("new_logo", file); // Append the file to FormData
 
-          const response = await axios.put(
+          await axios.put(
             `${BaseUrl}clinic/logochange/`,
             formData,
             {
@@ -156,8 +144,8 @@ const LogoChange = () => {
     reader.readAsDataURL(file); // Convert the file to a data URL
   };
   const [logo, setLogo] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error1, setError1] = useState(null);
+  const [, setLoading] = useState(true);
+  const [, setError1] = useState(null);
 
   const getData = async () => {
     //   const apiUrl = 'http://127.0.0.1:8000/clinic/logochange/';
@@ -204,6 +192,7 @@ const LogoChange = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     setIsStaff(Cookies.get("is_staff") === "true");
     getData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleBreadClick(event) {
@@ -212,7 +201,7 @@ const LogoChange = () => {
   }
 
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+    <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
       {isSuperuser ? (
         <AdminSearch />
       ) : isVendor && !isStaff ? (
@@ -234,12 +223,12 @@ const LogoChange = () => {
         </Breadcrumbs>
       </div>
 
-      <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+      <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             {" "}
             Change Logo{" "}
-          </text>
+          </span>
         </div>
         {logo && (
           <div className=" mt-10 rounded">
@@ -271,7 +260,7 @@ const LogoChange = () => {
                           {imageSrc ? (
                             <img
                               src={imageSrc}
-                              alt="Image preview"
+                              alt="Preview"
                               style={{ maxWidth: "200px", maxHeight: "200px" }}
                             />
                           ) : (

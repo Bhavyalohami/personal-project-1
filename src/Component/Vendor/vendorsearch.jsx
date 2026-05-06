@@ -1,155 +1,287 @@
-import { CiSearch } from "react-icons/ci";
-import { PiChatsCircle } from "react-icons/pi";
-import { FaBell } from "react-icons/fa";
-import { Link } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
-import { RiArrowDownSLine } from "react-icons/ri";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Cookies from "js-cookie";
+import axios from "axios";
+import {
+  FaBell,
+  FaCalendarCheck,
+  FaChevronDown,
+  FaPowerOff,
+  FaRegClock,
+  FaShieldHeart,
+} from "react-icons/fa6";
 import BaseUrl from "../../Api/baseurl";
+
+const fallbackAvatar = "/brand/patient-avatar-teal.png";
+
+const pageTitles = {
+  "/vendor": "Vendor Dashboard",
+  "/vendor/staff": "Clinic Staff",
+  "/vendor/managepatients": "Patient Registry",
+  "/vendor/appointments": "Appointment Queue",
+  "/vendor/messages": "Messages",
+  "/vendor/inventory": "Inventory",
+  "/vendor/hospital-profile": "Hospital Profile",
+  "/vendor/tests": "Tests & Slots",
+  "/vendor/consultationquery": "Consultation Queries",
+  "/vendor/managecontent": "Content Studio",
+  "/vendor/blogs": "Blog Operations",
+  "/vendor/blogcategories": "Blog Categories",
+  "/vendor/services": "Service Catalog",
+  "/vendor/feedback": "Patient Feedback",
+  "/vendor/manageenquiries": "Clinic Enquiries",
+  "/vendor/manageslots": "Slot Studio",
+  "/vendor/manageholidays": "Holiday Planner",
+  "/vendor/managelocation": "Clinic Locations",
+  "/vendor/managedepartment": "Departments",
+  "/vendor/myprofile": "Vendor Profile",
+  "/vendor/changepassword": "Security",
+  "/vendor/notification": "Notifications",
+  "/vendor/logochange": "Brand Logo",
+  "/vendor/faviconchange": "Favicon",
+  "/vendor/socialmediaprofiles": "Social Profiles",
+  "/vendor/timings": "Clinic Timings",
+  "/vendor/slogantext": "Slogan",
+  "/vendor/address": "Clinic Address",
+  "/vendor/currencysettings": "Currency Settings",
+};
+
+const parseRoles = () => {
+  const rawRoles = Cookies.get("roles");
+  if (!rawRoles) return { ids: [], names: [] };
+
+  let values = [];
+  try {
+    const parsed = JSON.parse(rawRoles);
+    values = Array.isArray(parsed) ? parsed : [parsed];
+  } catch (error) {
+    values = rawRoles.split(",");
+  }
+
+  return values.reduce(
+    (result, role) => {
+      const value = typeof role === "string" ? role.trim() : role;
+      const numberValue = Number(value);
+
+      if (Number.isFinite(numberValue)) {
+        result.ids.push(numberValue);
+      } else if (value) {
+        result.names.push(String(value).toLowerCase());
+      }
+
+      return result;
+    },
+    { ids: [], names: [] },
+  );
+};
 
 const VendorSearch = () => {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [data, setData] = useState({
     image: "",
     fname: "",
+    lname: "",
+    name: "",
   });
-  const roles = Cookies.get("roles")
-    ? Cookies.get("roles")
-        .split(",")
-        .map((role) => parseInt(role, 10))
-    : [];
-
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [isSuperuser, setIsSuperuser] = useState(false);
-  const [isVendor, setIsVendor] = useState(false);
-  const [isStaff, setIsStaff] = useState(false);
   const count = useRef(0);
-  useEffect(() => {
-    const superuser = Cookies.get("is_superuser") === "true";
-    const staff = Cookies.get("is_staff") === "true";
-    const vendor = Cookies.get("is_vendor") === "true";
-    setIsVendor(vendor);
-    setIsSuperuser(superuser);
-    setIsStaff(staff);
-    getData();
-    if (!superuser) {
-      fetchData();
-    }
-  }, [isSuperuser]);
+  const roles = useMemo(parseRoles, []);
+  const username = Cookies.get("username") || "vendor";
+  const pageTitle =
+    pageTitles[pathname.replace(/\/$/, "")] ||
+    (pathname.includes("edit")
+      ? "Update Workspace"
+      : pathname.includes("add")
+      ? "Create Workspace Record"
+      : "Vendor Workspace");
 
-  const getData = async () => {
-    const username = Cookies.get("username");
-    const response = await axios.get(
-      `${BaseUrl}clinic/get-notification/${username}/`
-    );
-    count.current = response.data.unread_count;
-  };
-  const handleLogout = (tab) => {
-    Cookies.remove("token");
-    Cookies.remove("username");
-    Cookies.remove("is_superuser");
-    Cookies.remove("is_vendor");
-    Cookies.remove("is_staff");
-    Cookies.remove("status");
-    Cookies.remove("roles");
-    Cookies.remove("subroles");
-    navigate("/vendor/login");
-  };
-
-  const fetchData = async () => {
-    const user = Cookies.get("username");
-    const apiUrl = `${BaseUrl}clinic/vendor-profile/${user}`;
-    const token = Cookies.get("token");
+  const getNotificationCount = useCallback(async () => {
     try {
-      const response = await axios.get(apiUrl, {
+      const currentUsername = Cookies.get("username");
+      if (!currentUsername) return;
+      const response = await axios.get(
+        `${BaseUrl}clinic/get-notification/${currentUsername}/`,
+      );
+      count.current = response.data?.unread_count || 0;
+    } catch (error) {
+      count.current = 0;
+    }
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    const user = Cookies.get("username");
+    if (!user) return;
+
+    try {
+      const response = await axios.get(`${BaseUrl}clinic/vendor-profile/${user}`, {
         headers: {
-          Authorization: `Token ${token}`,
+          Authorization: `Token ${Cookies.get("token")}`,
         },
       });
-      setData(response.data, "data");
+      setData(response.data || {});
     } catch (error) {
-      console.error("Error:", error);
+      setData((current) => ({ ...current, fname: username }));
     }
+  }, [username]);
+
+  useEffect(() => {
+    getNotificationCount();
+    fetchData();
+  }, [fetchData, getNotificationCount]);
+
+  const handleLogout = () => {
+    [
+      "token",
+      "username",
+      "is_superuser",
+      "is_vendor",
+      "is_staff",
+      "status",
+      "roles",
+      "subroles",
+    ].forEach((name) => Cookies.remove(name));
+
+    navigate("/vendor/login", { replace: true });
   };
 
+  const profileName =
+    [data.fname, data.lname].filter(Boolean).join(" ") ||
+    data.name ||
+    data.username ||
+    username;
+  const avatar = data.image || data.logo || data.new_logo || fallbackAvatar;
+  const canUseAccountLinks =
+    roles.ids.includes(15) ||
+    roles.names.includes("vendor") ||
+    Cookies.get("is_vendor") === "true";
+
   return (
-    <div className="w-full flex items-center justify-around">
-      {/* <div className="container m-0 p-0 relative flex items-center w-full md:w-2/3">
-        <input
-          className="w-full h-[50px] px-4 self-center border border-black-800 rounded"
-          type="text"
-          placeholder="Search"
-        />
-        <Link className="flex absolute right-[10px] items-center">
-          <CiSearch className="text-3xl" />
-        </Link>
-      </div> */}
-      <div className="w-0 md:w-full gap-8 flex justify-end">
-        {/* <Link className="hidden md:flex items-center"><PiChatsCircle className="text-4xl" /></Link> */}
-        {/* <Link to='/doctor/notification' className="hidden md:flex items-center"><FaBell className="text-3xl" /></Link> */}
-        {roles.includes(17) && (
+    <header className="doctor-topbar mb-6 overflow-hidden rounded-[2rem] border border-[#67E8F9]/55 bg-white/80 px-4 py-4 shadow-xl shadow-teal-950/5 backdrop-blur md:px-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-[#0D9488]">
+            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#ECFEFF] text-[#0D9488]">
+              <FaShieldHeart />
+            </span>
+            Live vendor command center
+          </div>
+          <h1 className="mt-2 text-2xl font-black text-[#134E4A] sm:text-3xl">
+            {pageTitle}
+          </h1>
+          <p className="mt-1 text-sm font-semibold text-[#134E4A]/60">
+            Coordinate doctors, patients, schedules, content, and clinic operations from one focused hub.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="hidden rounded-2xl border border-[#67E8F9]/45 bg-[#ECFEFF] px-4 py-3 text-sm font-black text-[#134E4A] sm:flex sm:items-center sm:gap-3">
+            <FaRegClock className="text-[#0D9488]" />
+            {new Date().toLocaleDateString("en-IN", {
+              weekday: "short",
+              day: "2-digit",
+              month: "short",
+            })}
+          </div>
+
+          <Link
+            to="/vendor/appointments"
+            className="flex h-12 items-center gap-2 rounded-2xl bg-[#0D9488] px-4 text-sm font-black text-white shadow-lg shadow-teal-900/10 transition hover:bg-[#134E4A]"
+          >
+            <FaCalendarCheck />
+            Queue
+          </Link>
+
           <Link
             to="/vendor/notification"
-            className="hidden md:flex items-center relative"
+            className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-[#67E8F9]/55 bg-white text-[#134E4A] shadow-lg shadow-teal-950/5 transition hover:bg-[#ECFEFF]"
+            aria-label="Notifications"
           >
-            <FaBell className="text-3xl" />
+            <FaBell />
             {count.current > 0 && (
-              <span className="absolute top-3 left-5 bg-red-600 text-white rounded-full text-xs w-4 h-4 flex items-center justify-center">
+              <span className="absolute right-2 top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#F59E0B] px-1 text-[10px] font-black text-[#134E4A]">
                 {count.current}
               </span>
             )}
           </Link>
-        )}
-        <div className="flex flex-col">
-          <Link onClick={() => setDropdownOpen(!dropdownOpen)} className="">
-            <div className="hidden md:flex items-center gap-3 px-3 rounded-lg  border-2 border-black-800 p-2">
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((value) => !value)}
+              className="flex h-12 items-center gap-3 rounded-2xl border border-[#67E8F9]/55 bg-white px-3 text-sm font-black text-[#134E4A] shadow-lg shadow-teal-950/5 transition hover:bg-[#ECFEFF]"
+            >
               <img
-                src={data.image}
-                className="w-[40px] h-[40px] rounded-full "
-                alt=""
+                src={avatar}
+                className="h-8 w-8 rounded-xl object-cover"
+                alt={profileName}
               />
-              <div className="font-medium flex items-center">
-                {" "}
-                {data.fname} <RiArrowDownSLine className="text-[20px] ml-1" />
+              <span className="hidden max-w-36 truncate md:block">
+                {profileName}
+              </span>
+              <FaChevronDown className="text-xs text-[#0D9488]" />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute right-0 top-14 z-50 w-56 overflow-hidden rounded-2xl border border-[#67E8F9]/55 bg-white shadow-2xl shadow-teal-950/15">
+                {canUseAccountLinks && (
+                  <>
+                    <Link
+                      to="/vendor/myprofile"
+                      className="block px-4 py-3 text-sm font-black text-[#134E4A] transition hover:bg-[#ECFEFF] hover:text-[#0D9488]"
+                      onClick={() => setDropdownOpen(false)}
+                    >
+                      My Profile
+                    </Link>
+                    <Link
+                      to="/vendor/changepassword"
+                      className="block px-4 py-3 text-sm font-black text-[#134E4A] transition hover:bg-[#ECFEFF] hover:text-[#0D9488]"
+                      onClick={() => setDropdownOpen(false)}
+                    >
+                      Change Password
+                    </Link>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-black text-[#134E4A] transition hover:bg-[#F59E0B]/15"
+                >
+                  <FaPowerOff />
+                  Log Out
+                </button>
               </div>
-            </div>
-          </Link>
-          {dropdownOpen && (
-            <div className="mt-2 !w-48 absolute z-1 right-[32px] top-[83px] rounded-lg w-full bg-gray-100 shadow-lg">
-              {roles.includes(15) && (
-                <Link
-                  to="/vendor/myprofile"
-                  className={`block  px-4 py-2 font-semibold text-[#113C54] rounded-t-lg hover:bg-gray-300`}
-                  onClick={() => "myprofile"}
-                >
-                  My Profile
-                </Link>
-              )}
-              <hr className="text-black-800 border-[2px] mx-4" />
-              {roles.includes(16) && (
-                <Link
-                  to="/vendor/changepassword"
-                  className={`block px-4 py-2 font-semibold text-[#113C54]  hover:bg-gray-300`}
-                  onClick={() => "changepassword"}
-                >
-                  Change Password
-                </Link>
-              )}
-              <hr className="text-black-800 border-[2px] mx-4" />
-              <Link
-                to="/vendor/login"
-                className={`block px-4 py-2 font-semibold text-[#113C54] rounded-b-lg hover:bg-gray-300`}
-                onClick={() => handleLogout()}
-              >
-                Log Out
-              </Link>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      <div className="mt-4 overflow-hidden rounded-2xl border border-[#67E8F9]/40 bg-[#134E4A] py-2 text-xs font-black uppercase tracking-[0.2em] text-cyan-50">
+        <div className="care-marquee flex min-w-max gap-8 whitespace-nowrap">
+          {[
+            "Clinic operations",
+            "Staff coordination",
+            "Appointment flow",
+            "Content updates",
+            "Feedback watch",
+            "Service catalog",
+            "Secure vendor workspace",
+            "Clinic operations",
+            "Staff coordination",
+            "Appointment flow",
+            "Content updates",
+            "Feedback watch",
+            "Service catalog",
+            "Secure vendor workspace",
+          ].map((item, index) => (
+            <span key={`${item}-${index}`} className="flex items-center gap-3">
+              <span className="h-2 w-2 rounded-full bg-[#F59E0B]" />
+              {item}
+            </span>
+          ))}
+        </div>
+      </div>
+    </header>
   );
 };
 

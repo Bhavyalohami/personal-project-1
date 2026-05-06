@@ -101,7 +101,7 @@ const ChangePassword = () => {
       if (confirmationResult.isConfirmed) {
         // const token = localStorage.getItem('auth_token');
         const token = Cookies.get("token");
-        const response = await axios.put(
+        await axios.put(
           `${BaseUrl}clinic/changepassword/`,
           {
             old_password: currentPassword,
@@ -181,14 +181,6 @@ const ChangePassword = () => {
     setPasswordStrength({ strength, score });
   }, [newPassword]);
 
-  const passwordStrengthClasses = [
-    passwordStrength.strength.length ? "bg-green-200" : "bg-red-200",
-    passwordStrength.strength.uppercase ? "bg-green-200" : "bg-red-200",
-    passwordStrength.strength.lowercase ? "bg-green-200" : "bg-red-200",
-    passwordStrength.strength.digit ? "bg-green-200" : "bg-red-200",
-    passwordStrength.strength.special ? "bg-green-200" : "bg-red-200",
-  ];
-  const [superuser, setSuperuser] = useState(false);
   function handleBreadClick(event) {
     event.preventDefault();
   }
@@ -219,9 +211,9 @@ const ChangePassword = () => {
       </div>
       <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3 h-screen">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Change Password
-          </text>
+          </span>
         </div>
         <div className="p-6 mt-3 rounded-lg ">
           <form onSubmit={handleSubmit}>

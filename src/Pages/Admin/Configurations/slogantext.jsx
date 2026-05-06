@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { PhotoIcon } from "@heroicons/react/24/solid";
 import AdminSearch from "../../../Component/Admin/adminsearch";
 import VendorSearch from "../../../Component/Vendor/vendorsearch";
 import DoctorSearch from "../../../Component/Doctor/doctorsearch";
@@ -59,6 +58,7 @@ const SloganText = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     setIsStaff(Cookies.get("is_staff") === "true");
     getData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e) => {
@@ -110,7 +110,7 @@ const SloganText = () => {
           cancelButtonText: "No",
         });
         if (confirmationResult.isConfirmed) {
-          const response = await axios.put(
+          await axios.put(
             `${BaseUrl}clinic/slogan/`,
             formData,
             {
@@ -137,7 +137,7 @@ const SloganText = () => {
     console.info("You clicked a breadcrumb.");
   }
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+    <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
       {isSuperuser ? (
         <AdminSearch />
       ) : isVendor && !isStaff ? (
@@ -162,11 +162,11 @@ const SloganText = () => {
           </Link>
         </Breadcrumbs>
       </div>
-      <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+      <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Update Slogan Details
-          </text>
+          </span>
         </div>
         <div>
           <form id="Update Links" onSubmit={handleSubmit}>

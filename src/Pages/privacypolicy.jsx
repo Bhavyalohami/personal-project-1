@@ -1,92 +1,92 @@
-import { Link } from "react-router-dom";
-import parse from 'html-react-parser';
 import axios from "axios";
 import { useEffect, useState } from "react";
+import parse from "html-react-parser";
 import BaseUrl from "../Api/baseurl";
-import Cookies from 'js-cookie';
+
+const defaultPrivacyHtml = `
+  <h2>Information We Collect</h2>
+  <p>CareBridge may collect appointment details, contact information, profile data, doctor selections, preferred time slots, and messages you submit through the platform.</p>
+  <h2>How We Use Information</h2>
+  <p>We use this information to help clinics manage appointments, support patient communication, improve booking flows, and keep visit details organized.</p>
+  <h2>Firebase and Platform Data</h2>
+  <p>When Firebase services are connected, data may be stored in Firebase products such as Firestore, Authentication, Cloud Functions, Hosting, or Storage according to the project configuration.</p>
+  <h2>Data Sharing</h2>
+  <p>Appointment information may be shared with the clinic team, assigned doctors, and service providers needed to operate the platform. We do not sell patient appointment data.</p>
+  <h2>Your Choices</h2>
+  <p>You can request updates or corrections to your information by contacting the clinic team. Account users should keep login credentials private and sign out on shared devices.</p>
+`;
+
+const getTextValue = (page, fields) =>
+  fields
+    .map((field) => page?.[field])
+    .find((value) => typeof value === "string" && value.trim().length > 0);
 
 const PrivacyPolicy = () => {
-    const [data, setData] = useState(null);
-    const [error, setError] = useState(null);
+  const [data, setData] = useState(null);
+  const [hasApiError, setHasApiError] = useState(false);
+
+  useEffect(() => {
     const getData = async () => {
-        const apiUrl = `${BaseUrl}clinic/managepages/privacy-policy`;
-        // const token = localStorage.getItem('auth_token');
-        // const token = Cookies.get('token');
-        try {
-            const response = await axios.get(apiUrl, {
-                headers: {
-                    // Authorization: `Token ${token}`,
-                },
-            });
-            setData(response.data);
-        } catch (error) {
-            setError('Failed to fetch terms of service.');
-            console.error('Error fetching data:', error);
-        }
+      try {
+        const response = await axios.get(`${BaseUrl}clinic/managepages/privacy-policy`, {
+          headers: { "Content-Type": "application/json" },
+        });
+        setData(response.data || null);
+      } catch (error) {
+        setHasApiError(true);
+        console.error("Error fetching privacy policy:", error);
+      }
     };
 
-    useEffect(() => {
-        getData();
-    }, []);
+    getData();
+  }, []);
 
-    if (error) {
-        return <div>{error}</div>;
-    }
-    return (
-        <div>
-            <div className=" bg-[#F2EFEA] py-24">
-                <div className="container  mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
-                    <div className="flex flex-col justify-center items-center">
-                        <text className="text-[#011632] font-inter text-[52px] font-bold leading-62.4 tracking-tighter text-center">{data ? parse(data.title) : <p>Loading...</p>}</text>
-                        {/* <p className="text-[#3C4959] font-inter text-base font-normal leading-7 tracking-tight text-center w-full lg:w-1/3 xl:w-1/4">This page involves detailing how this website or data collects, uses, discloses, and protects users' personal information.</p> */}
-                    </div>
-                </div>
-            </div>
+  const title = getTextValue(data, ["title", "name", "page_title"]) || "Privacy Policy";
+  const contentHtml =
+    getTextValue(data, ["content", "text", "body", "html", "description"]) || defaultPrivacyHtml;
 
-
-            {/* <div className="container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48 py-12">
-                <div className="flex flex-col lg:flex-row items-center justify-center mb-4">
-                    <div className="w-full lg:w-2/3 pr-12">
-                        <p className="font-inter text-[18px] font-normal leading-7 text-left mb-4"> Doctor’s Consultation is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website<span className="text-blue-800"><Link to='https://google.com' target="_blank"> www.doctor’s-consultation.com</Link></span>, use our mobile application, or engage with our services. Please read this policy carefully to understand our views and practices regarding your personal data and how we will treat it.</p>
-                        <text className="font-semibold font-inter text-[20px] leading-7 text-left ">Information We Collect</text>
-                        <p className="font-inter text-[18px] font-normal leading-7 text-left">We may collect and process the following data about you:</p>
-                        <p className="font-inter text-[18px] font-normal leading-7 text-left"><span className="font-medium">• Personal Information:</span> When you register, make a purchase, or interact with our services, we may collect personal information such as your name, email address, phone number, mailing address, payment information, and other details you provide</p>
-                        <p className="font-inter text-[18px] font-normal leading-7 text-left"><span className="font-medium">• Usage Data:</span> We may collect information about how you use our website and services, including your IP address, browser type, operating system, pages visited, and the date and time of your visit.</p>
-                        <p className="font-inter text-[18px] font-normal leading-7 text-left mb-4"><span className="font-medium">• Cookies and Tracking Technologies:</span> We use cookies, web beacons, and similar technologies to collect information about your interaction with our website and services.</p>
-
-                        <text className=" font-semibold font-inter text-[20px] leading-7 text-left">How We Use Your Information</text>
-                        <p className="font-inter text-[18px] font-normal leading-7 text-left">We may use the information we collect from you in the following ways:</p>
-                        <p className="font-inter text-[18px] font-normal leading-7 text-left "><span className="font-medium">• To Provide and Maintain Our Services:</span> To provide, operate, and maintain our website and services.</p>
-                        <p className="font-inter text-[18px] font-normal leading-7 text-left "><span className="font-medium">• To Improve Our Services:</span> To understand and analyze how you use our services, and to develop new products, services, and features.</p>
-                        <p className="font-inter text-[18px] font-normal leading-7 text-left "><span className="font-medium">• To Communicate with You:</span> To send you updates, newsletters, marketing materials, and other information that may be of interest to you.</p>
-                        <p className="font-inter text-[18px] font-normal leading-7 text-left "><span className="font-medium">• For Legal and Security Purposes:</span> To comply with legal obligations, resolve disputes, and enforce our agreements.</p>
-                    </div>
-
-                    <div className="w-full h-max lg:w-1/3 self-start flex flex-col lg:flex-row items-center">
-                        <img className="" src="/assets/Privacy_policy/privacy.png" alt="" />
-                    </div>
-                </div>
-
-                <text className=" font-semibold font-inter text-[20px] leading-7 text-left">How We Share Your Information</text>
-                <p className="font-inter text-[18px] font-normal leading-7 text-left">We may collect and process the following data about you:</p>
-                <p className="font-inter text-[18px] font-normal leading-7 text-left "><span className="font-medium">• Service Providers:</span> Third-party vendors and service providers who assist us in providing our services.</p>
-                <p className="font-inter text-[18px] font-normal leading-7 text-left "><span className="font-medium">• Business Transfers:</span> In connection with any merger, sale of company assets, financing, or acquisition of all or a portion of our business.</p>
-                <p className="font-inter text-[18px] font-normal leading-7 text-left mb-4"><span className="font-medium">• Legal Requirements:</span> If required to do so by law or in response to valid requests by public authorities.</p>
-
-                <text className=" font-semibold font-inter text-[20px] leading-7 text-left">Data Security</text>
-                <p className="font-inter text-[18px] font-normal leading-7 text-left mb-4">We implement reasonable security measures to protect your personal information from unauthorized access, alteration, disclosure, or destruction. However, no security system is impenetrable, and we cannot guarantee the absolute security of your data.</p>
-
-                <text className=" font-semibold font-inter text-[20px] leading-7 text-left">Your Rights</text>
-                <p className="font-inter text-[18px] font-normal leading-7 text-left mb-4">Depending on your location, you may have certain rights regarding your personal data, including the right to access, correct, delete, or restrict its use. To exercise these rights, please contact us at <span className="text-blue-800">info@doctorsconsulation.com</span>.</p>
-
-                <text className=" font-semibold font-inter text-[20px] leading-7 text-left"> Third-Party Links</text>
-                <p className="font-inter text-[18px] font-normal leading-7 text-left mb-4">Our website and services may contain links to third-party websites. We are not responsible for the privacy practices or content of these third-party sites.</p>
-            </div> */}
-            <div className="container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48 py-16">
-                {data ? parse(data.content) : <p>Loading...</p>}
-            </div>
+  return (
+    <main className="overflow-hidden bg-[#ECFEFF] text-[#134E4A]">
+      <section className="relative px-5 py-16 sm:px-8 lg:px-12">
+        <div className="absolute inset-0 care-scan-grid opacity-40" aria-hidden="true" />
+        <div className="relative mx-auto max-w-6xl rounded-3xl border border-[#67E8F9]/50 bg-white/80 p-8 shadow-2xl shadow-teal-900/10 backdrop-blur lg:p-12">
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+            CareBridge privacy center
+          </p>
+          <h1 className="mt-4 text-4xl font-black leading-tight sm:text-6xl">{title}</h1>
+          <p className="mt-5 max-w-3xl text-base leading-8 text-[#134E4A]/70">
+            How appointment, account, and clinic workflow information is handled.
+          </p>
         </div>
-    )
-}
+      </section>
+
+      <section className="px-5 pb-20 sm:px-8 lg:px-12">
+        <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[0.34fr_0.66fr]">
+          <aside className="h-max rounded-3xl border border-[#67E8F9]/50 bg-[#134E4A] p-6 text-white shadow-xl shadow-teal-900/10">
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-[#67E8F9]">
+              Snapshot
+            </p>
+            <div className="mt-6 space-y-4 text-sm leading-7 text-cyan-50/80">
+              <p>Last updated: May 4, 2026</p>
+              <p>Applies to: patient bookings, guest requests, and clinic account flows.</p>
+              <p>Firebase content can replace this copy from the admin panel.</p>
+            </div>
+          </aside>
+
+          <article className="rounded-3xl border border-[#67E8F9]/50 bg-white p-6 shadow-xl shadow-teal-900/10 sm:p-8">
+            {hasApiError && (
+              <div className="mb-6 rounded-2xl border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-4 text-sm font-bold text-[#134E4A]">
+                Showing standard CareBridge privacy copy while Firebase content is unavailable.
+              </div>
+            )}
+            <div className="space-y-5 text-base leading-8 text-[#134E4A]/75 [&_h2]:pt-3 [&_h2]:text-2xl [&_h2]:font-black [&_h2]:text-[#134E4A] [&_p]:leading-8">
+              {parse(contentHtml)}
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  );
+};
 
 export default PrivacyPolicy;

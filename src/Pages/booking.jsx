@@ -1,20 +1,36 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import axios from "axios";
-import Swal from "sweetalert2";
 import Cookies from "js-cookie";
-import { useNavigate } from "react-router-dom";
 import BaseUrl from "../Api/baseurl";
 import LoaderH from "../Component/Loader/loader";
-import { Tooltip } from "@mui/material";
 import { format } from "date-fns";
-
-import { useMediaQuery } from "@mui/material";
-import { FaArrowRight } from "react-icons/fa";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaArrowRight } from "react-icons/fa";
+import {
+  FaCalendarCheck,
+  FaHeartPulse,
+  FaLocationDot,
+  FaShieldHeart,
+  FaUserDoctor,
+} from "react-icons/fa6";
 
 const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const bookingSteps = [
+  ["01", "Details saved"],
+  ["02", "Choose specialist"],
+  ["03", "Pick date and time"],
+  ["04", "Review payment"],
+];
+
+const legendItems = [
+  ["Available", "bg-emerald-100 border-emerald-300"],
+  ["Limited", "bg-amber-100 border-amber-300"],
+  ["Unavailable", "bg-rose-100 border-rose-300"],
+  ["Holiday", "bg-slate-200 border-slate-300"],
+  ["Selected", "bg-[#0D9488] border-[#0D9488]"],
+];
 
 const Booking = () => {
   const currentTime = new Date().toLocaleTimeString("en-GB", {
@@ -23,15 +39,15 @@ const Booking = () => {
     second: "2-digit",
     hour12: false,
   });
-  const currentDate = new Date();
-  const today = format(currentDate, "yyyy-MM-dd");
-  // console.log(currentTime);
+  const today = format(new Date(), "yyyy-MM-dd");
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const hospitalIdFromUrl = searchParams.get("hospitalId") || "";
   const [data, setData] = useState(null);
   const [selectedDate, setSelectedDate] = useState("");
   const [formData, setFormData] = useState({
-    date: selectedDate,
+    date: "",
     time: "",
     location: "",
     department: "",
@@ -41,6 +57,7 @@ const Booking = () => {
     sub_slot: "",
     amount: "",
     payment: "",
+    hospitalId: hospitalIdFromUrl,
   });
   const [formErrors, setFormErrors] = useState({
     date: "",
@@ -49,34 +66,29 @@ const Booking = () => {
     department: "",
     doctor: "",
     problem: "",
-    // username:""
   });
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [slots, setSlots] = useState({});
   const [error, setError] = useState(null);
-  // const [timeslots, setTimeslots] = useState([]);
-  // const [existingBookings, setExistingBookings] = useState([]);
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [doctor, setDoctor] = useState("");
-  // const [name, setName] = useState("");
   const [currentMonth, setCurrentMonth] = useState(dayjs());
-  const [hoveredDate, setHoveredDate] = useState(null);
   const [bookings, setBookings] = useState({});
   const [holidays, setHolidays] = useState([]);
   const [selectedTime, setSelectedTime] = useState("");
-  const slotsRef = useRef();
+  const [subSlots, setSubSlots] = useState([]);
+
   const generateDaysInMonth = (month) => {
     const startOfMonth = month.startOf("month");
     const endOfMonth = month.endOf("month");
-
     let startDayOfWeek = startOfMonth.day();
     startDayOfWeek = startDayOfWeek === 0 ? 7 : startDayOfWeek;
 
     const days = [];
     let currentDay = startOfMonth;
 
-    for (let i = 1; i < startDayOfWeek; i++) {
+    for (let i = 1; i < startDayOfWeek; i += 1) {
       days.push(null);
     }
 
@@ -87,62 +99,88 @@ const Booking = () => {
 
     return days.slice(0, endOfMonth.date() + startDayOfWeek - 1);
   };
+
   const daysInMonth = generateDaysInMonth(currentMonth);
+
+  const activeLocations = Array.isArray(location)
+    ? location.filter((item) => item.status === 1)
+    : [];
+
+  const departmentOptions = Array.from(
+    new Map(
+      departments
+        .filter((item) => item.location === formData.location)
+        .map((item) => [item.department, item])
+    ).values()
+  );
+
+  const doctorOptions = Array.from(
+    new Map(
+      departments
+        .filter(
+          (item) =>
+            item.location === formData.location &&
+            item.department === formData.department &&
+            item.status === 1
+        )
+        .map((item) => [item.username, item])
+    ).values()
+  );
+
+  const selectedDoctor = doctorOptions.find(
+    (item) => item.username === formData.username
+  );
+
+  const visibleSubSlots = subSlots.filter((item) => {
+    if (!item.is_active) return false;
+    if (selectedDate === today && item.start_time <= currentTime) return false;
+    return true;
+  });
+
+  const selectedSummary = [
+    ["Location", formData.location || "Not selected"],
+    ["Department", formData.department || "Not selected"],
+    ["Doctor", formData.doctor || "Not selected"],
+    ["Date", formData.date ? dayjs(formData.date).format("DD MMM YYYY") : "Not selected"],
+    ["Time", formData.time || "Not selected"],
+  ];
 
   const isHoliday = (date) =>
     date &&
     holidays.some((holiday) => holiday.date === date.format("YYYY-MM-DD"));
 
-  const handleMouseEnter = (day) => {
-    if (!holidays.includes(day.format("YYYY-MM-DD"))) {
-      setHoveredDate({
-        fullDate: day.format("YYYY-MM-DD"),
-        dayOfWeek: day.format("dddd"),
-        bookingInfo: getBookingInfo(day),
-      });
-    }
-  };
+  const getData = useCallback(async (username) => {
+    if (!username) return;
 
-  const handleMouseLeave = () => {
-    setHoveredDate(null);
-  };
-
-  const getData = async (username) => {
     try {
       const year = currentMonth.year();
       const month = currentMonth.month() + 1;
-      // const token = Cookies.get("token");
-      const apiUrl = `${BaseUrl}clinic/monthly/${year}/${month}/`;
-      const response = await axios.get(apiUrl, {
-        params: {
-          username: username,
-        },
+      const response = await axios.get(`${BaseUrl}clinic/monthly/${year}/${month}/`, {
+        params: { username },
       });
-      setSlots(response.data);
-      slotsRef.current = response.data;
+      const monthlyData = response.data || {};
       const updatedBookings = {};
 
-      for (const date in response.data) {
-        const total = response.data[date].total_count;
-        const booked = response.data[date].total_booked;
-
-        let allSubSlots = [];
-
-        response.data[date].slots.forEach((slot) => {
-          allSubSlots = allSubSlots.concat(slot.sub_slots);
-        });
+      Object.keys(monthlyData).forEach((date) => {
+        const total = monthlyData[date].total_count;
+        const booked = monthlyData[date].total_booked;
+        const allSubSlots = (monthlyData[date].slots || []).flatMap(
+          (slot) => slot.sub_slots || []
+        );
         updatedBookings[date] = { total, booked, subSlots: allSubSlots };
-      }
+      });
+
+      setSlots(monthlyData);
       setBookings(updatedBookings);
-      // handleUpdatedData(selectedDate.fullDate);
     } catch (error) {
       console.error("Error fetching slot data:", error);
     }
-  };
+  }, [currentMonth]);
 
   const getBookingInfo = (date) => {
     if (!date) return { total: 0, booked: 0, subSlots: [] };
     const bookingInfo = bookings[date.format("YYYY-MM-DD")];
+
     return bookingInfo
       ? {
           total: bookingInfo.total,
@@ -156,257 +194,228 @@ const Booking = () => {
     const date = new Date(`1970-01-01T${timeString}`);
     return format(date, "HH:mm");
   };
-  useEffect(() => {
-    if (doctor) {
-      fetchdata(doctor);
-    }
-  }, [doctor]);
-  useEffect(() => {
-    getSlotData(doctor);
-  }, [currentMonth]);
 
-  useEffect(() => {
-    getLocation();
-    if (formData.location) {
-      getDepartments(formData.location);
-    } else {
-      setDepartments([]);
-    }
-  }, [formData.location]);
+  const getProgressColor = (percentage) => {
+    if (percentage === 100) return "bg-rose-500";
+    if (percentage >= 75) return "bg-amber-500";
+    if (percentage > 0) return "bg-emerald-500";
+    return "bg-[#67E8F9]";
+  };
+
+  const getProgressBackground = (percentage, isBooked) => {
+    if (percentage === 100) return "bg-rose-100 border-rose-200";
+    if (percentage >= 75) return "bg-amber-100 border-amber-200";
+    if (percentage > 0 || isBooked) return "bg-emerald-100 border-emerald-200";
+    return "bg-white border-[#67E8F9]/40";
+  };
 
   useEffect(() => {
     const name = Cookies.get("name");
     if (!name) {
-      navigate("/getdetails");
+      navigate(
+        hospitalIdFromUrl
+          ? `/getdetails?hospitalId=${encodeURIComponent(hospitalIdFromUrl)}`
+          : "/getdetails"
+      );
+      return;
     }
 
     const storedData = localStorage.getItem("formData");
     if (storedData) {
       setData(JSON.parse(storedData));
     }
-  }, [selectedDate]);
+  }, [hospitalIdFromUrl, navigate]);
 
-  const getDepartments = async (location) => {
-    try {
-      const response = await axios.get(`${BaseUrl}clinic/staff-list/`, {});
-      setDepartments(response.data);
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-  const getLocation = async () => {
-    try {
-      const response = await axios.get(`${BaseUrl}clinic/managelocation/`, {});
-      setLocation(response.data);
-      // console.log(response.data);
-    } catch (error) {
-      setError(error.message);
-    }
-  };
+  useEffect(() => {
+    const getLocation = async () => {
+      try {
+        const response = await axios.get(`${BaseUrl}clinic/managelocation/`, {});
+        setLocation(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        setError(error.message);
+      }
+    };
 
-  const fetchdata = async (username) => {
-    try {
-      const apiUrl = `${BaseUrl}clinic/manageholiday/${username}`;
-      const response = await axios.get(apiUrl);
-      setHolidays(
-        response.data.map((item) => ({
-          date: item.date,
-          comment: item.comment,
-        }))
-      );
-      // console.log(holidays, "holidays");
-    } catch (error) {
-      console.error("Error fetching slot data:", error);
+    getLocation();
+  }, []);
+
+  useEffect(() => {
+    const getDepartments = async () => {
+      try {
+        const response = await axios.get(`${BaseUrl}clinic/staff-list/`, {});
+        setDepartments(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        setError(error.message);
+      }
+    };
+
+    if (formData.location) {
+      getDepartments();
+    } else {
+      setDepartments([]);
     }
-  };
-  const getProgressColor = (percentage) => {
-    if (percentage == 100) {
-      return "bg-red-500";
-    } else if (percentage >= 75) {
-      return "bg-orange-500";
-    } else if (percentage > 0) {
-      return "bg-green-500";
+  }, [formData.location]);
+
+  useEffect(() => {
+    if (doctor) {
+      getData(doctor);
     }
-    return "bg-white";
-  };
-  const getprogresscolor = (percentage, isBooked) => {
-    if (percentage == 100) {
-      return "bg-red-100";
-    } else if (percentage >= 75) {
-      return "bg-orange-100";
-    } else if (percentage > 0 || isBooked) {
-      return "bg-green-100";
-    }
-    return "bg-white";
-  };
+  }, [doctor, getData]);
+
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      if (!doctor) return;
+
+      try {
+        const response = await axios.get(`${BaseUrl}clinic/manageholiday/${doctor}`);
+        setHolidays(
+          (response.data || []).map((item) => ({
+            date: item.date,
+            comment: item.comment,
+          }))
+        );
+      } catch (error) {
+        console.error("Error fetching holiday data:", error);
+      }
+    };
+
+    fetchHolidays();
+  }, [doctor]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
     setFormErrors((prev) => ({ ...prev, [name]: "" }));
+
     if (name === "location") {
-      formData.doctor = "";
-      formData.department = "";
-      formData.date = "";
-      setDoctor("");
-    }
-    if (name === "department") {
-      setDoctor("");
-    }
-    if (name === "doctor" && value !== "") {
-      handleDoctorChange(value);
-      formData.date = "";
-    }
-    if (name === "doctor" && value === "") {
-      setDoctor("");
-    }
-  };
-  const handleDoctorChange = (user) => {
-    setSelectedDate(dayjs().format("YYYY-MM-DD"));
-    const doctorData = departments.find((doctor) => doctor.username === user);
-    if (doctorData) {
       setFormData((prev) => ({
         ...prev,
-        doctor: doctorData.fname + " " + doctorData.lname,
-        username: doctorData.username,
-        amount: doctorData.amount,
+        location: value,
+        department: "",
+        doctor: "",
+        username: "",
+        date: "",
+        time: "",
+        sub_slot: "",
+        amount: "",
       }));
-      setDoctor(doctorData.username);
-      getData(doctorData.username);
+      setDoctor("");
+      setSelectedDate("");
+      setSelectedTime("");
+      setSubSlots([]);
+      setSlots({});
+      setBookings({});
+      return;
     }
-    getSlotData(doctorData.username);
+
+    if (name === "department") {
+      setFormData((prev) => ({
+        ...prev,
+        department: value,
+        doctor: "",
+        username: "",
+        date: "",
+        time: "",
+        sub_slot: "",
+        amount: "",
+      }));
+      setDoctor("");
+      setSelectedDate("");
+      setSelectedTime("");
+      setSubSlots([]);
+      setSlots({});
+      setBookings({});
+      return;
+    }
+
+    if (name === "doctor") {
+      if (value) {
+        handleDoctorChange(value);
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          doctor: "",
+          username: "",
+          date: "",
+          time: "",
+          sub_slot: "",
+          amount: "",
+        }));
+        setDoctor("");
+        setSelectedDate("");
+        setSelectedTime("");
+        setSubSlots([]);
+        setSlots({});
+        setBookings({});
+      }
+      return;
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleDoctorChange = (username) => {
+    const doctorData = departments.find((item) => item.username === username);
+    if (!doctorData) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      doctor: `${doctorData.fname} ${doctorData.lname}`,
+      username: doctorData.username,
+      amount: doctorData.amount,
+      date: "",
+      time: "",
+      sub_slot: "",
+    }));
+    setDoctor(doctorData.username);
     setSelectedDate("");
     setSelectedTime("");
+    setSubSlots([]);
+    getData(doctorData.username);
   };
-
-  const getSlotData = async (username) => {
-    const year = currentMonth.year();
-    const month = currentMonth.month() + 1;
-    try {
-      const apiUrl = `${BaseUrl}clinic/doctormonthlyslots/${username}/${year}/${month}`;
-      const response = await axios.get(apiUrl, {});
-      setSlots(response.data);
-    } catch (error) {
-      console.error("Error fetching slot data:", error);
-    }
-  };
-
-  const [subSlots, setSubSlots] = useState([]);
 
   const handleDateClick = (day) => {
     const dateString = day.format("YYYY-MM-DD");
-    if (holidays && !holidays.some((holiday) => holiday.date === dateString)) {
-      if (selectedDate === dateString) {
-        setSelectedDate("");
-        setSubSlots([]);
-        setSelectedTime("");
-        setFormData((prev) => ({ ...prev, date: "", time: "" }));
+    if (holidays.some((holiday) => holiday.date === dateString)) return;
+
+    if (selectedDate === dateString) {
+      setSelectedDate("");
+      setSubSlots([]);
+      setSelectedTime("");
+      setFormData((prev) => ({ ...prev, date: "", time: "", sub_slot: "" }));
+    } else {
+      setSelectedDate(dateString);
+      if (slots[dateString] && slots[dateString].slots) {
+        const allSubSlots = slots[dateString].slots.flatMap(
+          (slot) => slot.sub_slots || []
+        );
+        setSubSlots(allSubSlots);
       } else {
-        setSelectedDate(dateString);
-        if (slots[dateString] && slots[dateString].slots) {
-          const availableSlots = slots[dateString].slots;
-          const allSubSlots = availableSlots.flatMap(
-            (slot) => slot.sub_slots || []
-          );
-          setSubSlots(allSubSlots);
-          // console.log(allSubSlots);
-        } else {
-          setSubSlots([]);
-        }
-        setSelectedTime("");
-        setFormData((prev) => ({ ...prev, date: dateString, time: "" }));
+        setSubSlots([]);
       }
+      setSelectedTime("");
+      setFormData((prev) => ({ ...prev, date: dateString, time: "", sub_slot: "" }));
     }
     setFormErrors((prevErrors) => ({ ...prevErrors, date: "" }));
   };
 
   const handleTimeClick = (id, start, end) => {
-    setSelectedTime(id, start, end);
+    setSelectedTime(id);
     const timeValue = `${formatTime(start)} - ${formatTime(end)}`;
-    // console.log(timeValue);
     setFormData((prev) => ({ ...prev, time: timeValue, sub_slot: id }));
     setFormErrors((prevErrors) => ({ ...prevErrors, time: "" }));
   };
-
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   const errors = {};
-
-  //   if (formData.date === "") errors.date = "Please Select a Date";
-  //   if (formData.time === "") errors.time = "Please Select a Time";
-  //   if (!formData.location) errors.location = "Please Select a Location";
-  //   if (!formData.department) errors.department = "Please Select a Department";
-  //   if (!formData.doctor) errors.doctor = "Please Select a Doctor";
-  //   if (!formData.problem) errors.problem = "Please describe your Issue";
-  //   if (Object.keys(errors).length) {
-  //     setFormErrors(errors);
-  //     return;
-  //   }
-  //   const formDatatosend = {
-  //     ...data,
-  //     ...formData,
-  //   };
-
-  //   const token = Cookies.get("patient_token");
-  //   const config = {
-  //     headers: {
-  //       ...(token ? { Authorization: `Token ${token}` } : {}),
-  //     },
-  //   };
-  //   try {
-  //     setLoading(true);
-  //     window.scrollTo(0, 0);
-  //     await axios.post(
-  //       `${BaseUrl}clinic/submit-appointment/`,
-  //       formDatatosend,
-
-  //     );
-
-  //     setLoading(false);
-  //     Cookies.remove("name");
-  //     localStorage.removeItem("formData");
-
-  //     Swal.fire({
-  //       title: "Success!",
-  //       html: `
-  //             <div style="text-align:left">
-  //               <p style="font-weight:bold color:blue">Your appointment is scheduled for:</p>
-  //               <p><strong>Name:</strong> ${formDatatosend.name}</p>
-  //               <p><strong>Date:</strong> ${dayjs(formData.date).format(
-  //                 "DD MMMM YYYY"
-  //               )}</p>
-  //               <p><strong>Time:</strong> ${formData.time}</p>
-  //               <p><strong>Location:</strong> ${formData.location}</p>
-  //               <p><strong>Department:</strong> ${formData.department}</p>
-  //               <p><strong>Doctor:</strong> ${formData.doctor}</p>
-
-  //             </div>`,
-
-  //       icon: "success",
-  //       confirmButtonText: "OK",
-  //     });
-  //     navigate("/payment");
-  //   } catch (error) {
-  //     setLoading(false);
-  //     Swal.fire({
-  //       title: "Error!",
-  //       text: "There was an error submitting your booking.",
-  //       icon: "error",
-  //       confirmButtonText: "OK",
-  //     });
-  //   }
-  // };
 
   const handlesubmit = async (e) => {
     e.preventDefault();
     const errors = {};
 
-    // Validation checks
-    if (formData.date === "") errors.date = "Please Select a Date";
-    if (formData.time === "") errors.time = "Please Select a Time";
-    if (!formData.location) errors.location = "Please Select a Location";
-    if (!formData.department) errors.department = "Please Select a Department";
-    if (!formData.doctor) errors.doctor = "Please Select a Doctor";
-    if (!formData.problem) errors.problem = "Please describe your Issue";
+    if (formData.date === "") errors.date = "Please select a date";
+    if (formData.time === "") errors.time = "Please select a time";
+    if (!formData.location) errors.location = "Please select a location";
+    if (!formData.department) errors.department = "Please select a department";
+    if (!formData.doctor) errors.doctor = "Please select a doctor";
+    if (!formData.problem) errors.problem = "Please describe your issue";
+
     if (Object.keys(errors).length) {
       setFormErrors(errors);
       return;
@@ -415,9 +424,13 @@ const Booking = () => {
     const formDatatosend = {
       ...data,
       ...formData,
+      hospitalId: formData.hospitalId || hospitalIdFromUrl || localStorage.getItem("activeHospitalId") || "",
+      locationContext: {
+        hospitalId: formData.hospitalId || hospitalIdFromUrl || localStorage.getItem("activeHospitalId") || "",
+        selectedLocation: formData.location,
+      },
       payment_status: 0,
     };
-    // console.log(formData);
 
     navigate("/payment", {
       state: {
@@ -425,622 +438,495 @@ const Booking = () => {
       },
     });
   };
-  // const handlesubmit = async (e) => {
-  //   e.preventDefault();
-  //   const errors = {};
 
-  //   // Validation checks
-  //   if (formData.date === "") errors.date = "Please Select a Date";
-  //   if (formData.time === "") errors.time = "Please Select a Time";
-  //   if (!formData.location) errors.location = "Please Select a Location";
-  //   if (!formData.department) errors.department = "Please Select a Department";
-  //   if (!formData.doctor) errors.doctor = "Please Select a Doctor";
-  //   if (!formData.problem) errors.problem = "Please describe your Issue";
-  //   if (Object.keys(errors).length) {
-  //     setFormErrors(errors);
-  //     return;
-  //   }
-
-  //   const formDatatosend = {
-  //     ...data,
-  //     ...formData,
-  //     payment_status: 0,
-  //   };
-
-  //   const token = Cookies.get("patient_token");
-  //   const config = {
-  //     headers: {
-  //       ...(token ? { Authorization: `Token ${token}` } : {}),
-  //     },
-  //   };
-
-  //   try {
-  //     setLoading(true);
-  //     window.scrollTo(0, 0);
-
-  //     await axios.post(
-  //       `${BaseUrl}clinic/submit-appointment/`,
-  //       formDatatosend,
-  //       config
-  //     );
-  //     setLoading(false);
-  //     Cookies.remove("name");
-  //     localStorage.removeItem("formData");
-  //     Swal.fire({
-  //       title: "Success!",
-  //       html: `
-  //         <div style="text-align:left">
-  //           <p style="font-weight:bold color:blue">Your appointment is scheduled for:</p>
-  //           <p><strong>Name:</strong> ${formDatatosend.name}</p>
-  //           <p><strong>Date:</strong> ${dayjs(formData.date).format(
-  //             "DD MMMM YYYY"
-  //           )}</p>
-  //           <p><strong>Time:</strong> ${formData.time}</p>
-  //           <p><strong>Location:</strong> ${formData.location}</p>
-  //           <p><strong>Department:</strong> ${formData.department}</p>
-  //           <p><strong>Doctor:</strong> ${formData.doctor}</p>
-  //         </div>`,
-  //       icon: "success",
-  //       confirmButtonText: "Proceed to Payment",
-  //     }).then(() => {
-  //       navigate("/payment", {
-  //         state: {
-  //           appointmentDetails: formDatatosend,
-  //         },
-  //       });
-  //     });
-  //   } catch (error) {
-  //     setLoading(false);
-  //     Swal.fire({
-  //       title: "Error!",
-  //       text: "There was an error submitting your booking.",
-  //       icon: "error",
-  //       confirmButtonText: "OK",
-  //     });
-  //   }
-  // };
-
-  const [value, setValue] = useState(3);
-  const isSmallScreen = useMediaQuery("(max-width:600px)");
-  const isMediumScreen = useMediaQuery(
-    "(min-width:600px) and (max-width:960px)"
-  );
-  let ratingSize = "large";
-
-  if (isSmallScreen) {
-    ratingSize = "small";
-  } else if (isMediumScreen) {
-    ratingSize = "medium";
-  }
   return (
     <>
       {loading ? (
         <LoaderH />
       ) : (
-        <>
-          <div>
-            <div className="bg-[#F2EFEA] pt-6">
-              <div className="container grid grid-cols-2 mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
-                <div className="flex flex-col justify-center items-start text-black font-black text-lg sm:text-xl md:text-3xl lg:text-7xl">
-                  Get your Slot
+        <main className="overflow-hidden bg-[#ECFEFF] text-[#134E4A]">
+          <section className="relative px-5 py-12 sm:px-8 lg:px-12">
+            <div className="absolute inset-0 care-scan-grid opacity-40" aria-hidden="true" />
+            <div className="relative mx-auto grid max-w-7xl items-center gap-8 rounded-[2rem] border border-[#67E8F9]/50 bg-white/80 p-6 shadow-2xl shadow-teal-900/10 backdrop-blur lg:grid-cols-[1fr_0.8fr] lg:p-10">
+              <div>
+                <p className="inline-flex items-center gap-2 rounded-full border border-[#67E8F9]/60 bg-[#ECFEFF] px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                  <FaCalendarCheck />
+                  Appointment console
+                </p>
+                <h1 className="mt-5 max-w-3xl text-4xl font-black leading-tight sm:text-6xl">
+                  Build your clinic visit in a few precise steps.
+                </h1>
+                <p className="mt-5 max-w-2xl text-base leading-8 text-[#134E4A]/75">
+                  Select the clinic, department, specialist, and live slot. Your
+                  saved patient details move forward to payment after review.
+                </p>
+                <div className="mt-8 grid gap-3 sm:grid-cols-4">
+                  {bookingSteps.map(([number, label]) => (
+                    <div
+                      key={number}
+                      className="rounded-2xl border border-[#67E8F9]/50 bg-white p-4 shadow-sm"
+                    >
+                      <p className="text-xs font-black text-[#0D9488]">{number}</p>
+                      <p className="mt-2 text-sm font-black">{label}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex flex-col justify-center items-end">
-                  <img src="/assets/Mainabout.png" alt="" />
+              </div>
+              <div className="relative">
+                <div className="care-float overflow-hidden rounded-[2rem] border border-[#67E8F9]/50 bg-[#134E4A] shadow-xl shadow-teal-900/10">
+                  <img
+                    src="/brand/consultation-care-teal.png"
+                    alt="CareBridge appointment consultation"
+                    className="h-[360px] w-full object-cover opacity-95"
+                  />
+                </div>
+                <div className="absolute -bottom-5 left-5 right-5 rounded-3xl border border-white/60 bg-white/90 p-4 shadow-xl shadow-teal-900/10 backdrop-blur">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                    Patient
+                  </p>
+                  <p className="mt-1 text-xl font-black">
+                    {data?.name || Cookies.get("name") || "Guest booking"}
+                  </p>
                 </div>
               </div>
             </div>
+          </section>
 
-            <div className="container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48 my-16">
-              <div className="flex flex-col lg:flex-row mt-16 gap-6">
-                <div className="flex flex-col w-full lg:w-3/5">
-                  <label className="font-inter text-base font-black leading-6 text-left text-[#585858] mb-2 px-2">
-                    Location<span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="location"
-                    id="location"
-                    className="h-[60px] w-full !px-4 !pr-6 rounded-[12px] bg-[#ffffff] border-2 border-gray-300 font-inter text-base font-normal leading-[24.2px] text-left"
-                    onChange={handleChange}
-                  >
-                    <option value="">Select a Location</option>
-                    {location.length > 0 ? (
-                      location
-                        .filter((location) => location.status === 1)
-                        .map((location) => (
-                          <option key={location.id} value={location.name}>
-                            {location.name}
+          <section className="px-5 pb-16 sm:px-8 lg:px-12">
+            <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.68fr_0.32fr]">
+              <form
+                onSubmit={handlesubmit}
+                className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-5 shadow-xl shadow-teal-900/10 sm:p-7"
+              >
+                <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                      Booking details
+                    </p>
+                    <h2 className="mt-2 text-3xl font-black">Choose your care path</h2>
+                  </div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-[#ECFEFF] px-4 py-2 text-sm font-bold text-[#134E4A]">
+                    <FaShieldHeart className="text-[#0D9488]" />
+                    Firebase-ready flow
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="mb-5 rounded-2xl border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-4 text-sm font-bold">
+                    {error}
+                  </div>
+                )}
+
+                <div className="grid gap-5 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 flex items-center gap-2 text-sm font-black">
+                      <FaLocationDot className="text-[#0D9488]" />
+                      Location <span className="text-rose-500">*</span>
+                    </span>
+                    <select
+                      name="location"
+                      id="location"
+                      value={formData.location}
+                      className="h-14 w-full rounded-2xl border border-[#67E8F9]/60 bg-[#ECFEFF]/70 px-4 text-sm font-bold outline-none transition focus:border-[#0D9488] focus:bg-white focus:ring-4 focus:ring-[#67E8F9]/30"
+                      onChange={handleChange}
+                    >
+                      <option value="">Select a location</option>
+                      {activeLocations.length > 0 ? (
+                        activeLocations.map((item) => (
+                          <option key={item.id} value={item.name}>
+                            {item.name}
                           </option>
                         ))
-                    ) : (
-                      <option disabled>Loading...</option>
-                    )}
-                  </select>
-                  <span className="text-red-500 ml-2 mt-0">
-                    {formErrors.location}
-                  </span>
-
-                  <label className="font-inter text-base font-black leading-6 text-left text-[#585858] mt-3 mb-2 px-2">
-                    Department<span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="department"
-                    id="department"
-                    className="h-[60px] w-full !px-4 !pr-6 rounded-[12px] bg-[#ffffff] border-2 border-gray-300 font-inter text-base font-normal leading-[24.2px] text-left"
-                    onChange={handleChange}
-                  >
-                    <option value="">Select a Department</option>
-                    {departments.length > 0 ? (
-                      Array.from(
-                        new Set(
-                          departments
-                            .filter(
-                              (department) =>
-                                department.location === formData.location
-                            )
-                            .map((department) => department.department)
-                        )
-                      ).map((department) => {
-                        const departmentData = departments.find(
-                          (dep) =>
-                            dep.department === department &&
-                            dep.location === formData.location
-                        );
-                        return (
-                          <option
-                            key={departmentData.id}
-                            value={departmentData.department}
-                          >
-                            {departmentData.department}
-                          </option>
-                        );
-                      })
-                    ) : (
-                      <option disabled>Select Location First....</option>
-                    )}
-                  </select>
-                  <span className="text-red-500 ml-2 mt-0">
-                    {formErrors.department}
-                  </span>
-
-                  <label className="font-inter text-base font-black leading-6 text-left text-[#585858] mb-2 mt-3 px-2">
-                    Doctor<span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="doctor"
-                    id="doctor"
-                    className="h-[60px] w-full !px-4 rounded-[12px] bg-[#ffffff] border-2 border-gray-300 font-inter text-base font-normal leading-[24.2px] text-left"
-                    onChange={handleChange}
-                  >
-                    <option value="">Select a Doctor</option>
-                    {departments.length > 0 ? (
-                      Array.from(
-                        new Set(
-                          departments
-                            .filter(
-                              (doctor) =>
-                                doctor.department === formData.department &&
-                                doctor.status === 1
-                            )
-                            .map((doctor) => doctor.username)
-                        )
-                      ).map((username) => {
-                        const doctorData = departments.find(
-                          (doc) =>
-                            doc.username === username &&
-                            doc.location === formData.location &&
-                            doc.department === formData.department
-                        );
-                        return doctorData ? (
-                          <option
-                            key={doctorData.id}
-                            value={doctorData.username}
-                          >
-                            {doctorData.fname + " " + doctorData.lname}
-                          </option>
-                        ) : null;
-                      })
-                    ) : (
-                      <option disabled>
-                        Select Location & Department First....
-                      </option>
-                    )}
-                  </select>
-                  <span className="text-red-500 ml-2 mt-0">
-                    {formErrors.doctor}
-                  </span>
-
-                  <label className="font-inter text-base font-black leading-6 text-left text-[#585858] px-2 mt-3 mb-2">
-                    Describe Your Issue<span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    name="problem"
-                    className="h-[151px] w-full px-4 py-2 rounded-[12px] bg-[#ffffff] border-2 border-gray-300 font-inter text-base font-normal leading-[24.2px]"
-                    onChange={handleChange}
-                  />
-                  <span className="text-red-500 ml-2 mt-0">
-                    {formErrors.problem}
-                  </span>
-                </div>
-                {doctor !== "" ? (
-                  Array.from(
-                    new Set(
-                      departments
-                        .filter(
-                          (doctor) =>
-                            doctor.department === formData.department &&
-                            doctor.status === 1
-                        )
-                        .map((doctor) => doctor.username)
-                    )
-                  ).map((username) => {
-                    const doctorData = departments.find(
-                      (doc) =>
-                        doc.username === username &&
-                        doc.location === formData.location &&
-                        doc.department === formData.department
-                    );
-                    return username === formData.username ? (
-                      <div className="w-full lg:w-2/5 flex flex-col items-center justify-center gap-2 bg-gray-200 p-4 rounded-xl">
-                        <img
-                          className="w-[120px] h-[120px] rounded-xl object-cover"
-                          src={doctorData.image}
-                          alt=""
-                        />
-                        <p className="text-[#011632] font-inter text-[28px] font-bold">
-                          {doctorData.fname} {doctorData.lname}
-                        </p>
-                        <div className="flex flex-col items-center gap-1 items-start w-full">
-                          <text className="font-semibold text-indigo-500 text-[16px]">
-                            {doctorData.department}
-                          </text>
-
-                          <text className="font-semibold text-[13px]">
-                            {doctorData.yoe} Years Of Experience
-                          </text>
-                        </div>
-                        <div className="flex flex-col gap-2 items-center">
-                          <text className="text-xl underline font-semibold">
-                            About
-                          </text>
-                          <p className="">{doctorData.introduction}</p>
-                        </div>
-
-                        <div className="flex w-full justify-end items-center">
-                          {/* <Box sx={{ "& > legend": { mt: 2 } }}>
-                            <Rating
-                              name="controlled"
-                              value={doctorData.rating}
-                              precision={0.5}
-                              // onChange={(event, newValue) => {
-                              //   setValue(newValue);
-                              // }}
-                              readOnly
-                              size={ratingSize}
-                            />
-                          </Box> */}
-
-                          <p className="text-lg font-bold text-blue-800">
-                            $<span className="ml-0.5">{doctorData.amount}</span>
-                          </p>
-                        </div>
-                      </div>
-                    ) : null;
-                  })
-                ) : (
-                  <img
-                    className="w-2/5 object-conver rounded-xl"
-                    src="/assets/Booking/book2.jpg"
-                    alt="Booking"
-                  />
-                )}
-              </div>
-              {doctor && (
-                <div className="flex justify-around mt-16 flex-col md:flex-row  sm:space-x-5 rtl:space-x-reverse">
-                  <div className="flex flex-col xl:flex-row w-full h-full bg-white border border-2 !border-gray-300 p-2 rounded-3xl">
-                    <div className=" mt-4 grid grid-cols-7 w-full ">
-                      <div className=" p-2 col-span-7">
-                        <div className="flex justify-between mb-4">
-                          <Tooltip title="Previous Month">
-                            <button
-                              className="bg-blue-500 text-xs lg:text-base text-white px-2 sm:!px-4 py-2 rounded"
-                              onClick={() =>
-                                setCurrentMonth(
-                                  currentMonth.subtract(1, "month")
-                                )
-                              }
-                            >
-                              <FaArrowLeft />
-                            </button>
-                          </Tooltip>
-                          <h2 className="flex items-center justify-center text-base text-center sm:text-lg font-bold">
-                            {currentMonth.format("MMMM ")}
-                            {currentMonth.year()}
-                          </h2>
-                          <Tooltip title="Next Month">
-                            <button
-                              className="bg-blue-500 text-xs lg:text-base text-white px-2 sm:!px-4 py-2 rounded"
-                              onClick={() =>
-                                setCurrentMonth(currentMonth.add(1, "month"))
-                              }
-                            >
-                              <FaArrowRight />
-                            </button>
-                          </Tooltip>
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-2 mb-2">
-                          {dayNames.map((day, index) => (
-                            <div
-                              key={index}
-                              className="flex items-center justify-center text-center font-bold border p-2 text-gray-700"
-                            >
-                              {day}
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-2">
-                          {daysInMonth.map((day, index) => {
-                            if (!day) {
-                              return <div key={index} className="p-4"></div>;
-                            }
-                            const PastDate = dayjs(day).isBefore(
-                              dayjs(),
-                              "day"
-                            );
-                            const bookingInfo = getBookingInfo(day);
-                            // console.log(bookingInfo, "bookingInfo");
-                            const isBooked = bookingInfo.total > 0;
-
-                            const isHolidayDate = isHoliday(day);
-                            const percentageBooked = isBooked
-                              ? (
-                                  (bookingInfo.booked / bookingInfo.total) *
-                                  100
-                                ).toFixed(2)
-                              : 0;
-                            const progressColor =
-                              getProgressColor(percentageBooked);
-                            const progresscolor = getprogresscolor(
-                              percentageBooked,
-                              isBooked
-                            );
-                            return (
-                              <div
-                                key={index}
-                                className={`relative p-2 border text-center cursor-pointer ${
-                                  isHolidayDate ? "bg-gray-300 " : progresscolor
-                                } ${
-                                  selectedDate === day.format("YYYY-MM-DD")
-                                    ? "border-4 !border-blue-500"
-                                    : ""
-                                }${
-                                  PastDate
-                                    ? "cursor-not-allowed cursor-banned text-gray-400 bg-white"
-                                    : ""
-                                } `}
-                                onClick={
-                                  !PastDate ? () => handleDateClick(day) : null
-                                }
-                                onMouseEnter={
-                                  !PastDate ? () => handleMouseEnter(day) : null
-                                }
-                                onMouseLeave={
-                                  !PastDate ? handleMouseLeave : null
-                                }
-                              >
-                                {!isHolidayDate ? (
-                                  <Tooltip
-                                    arrow
-                                    aria-label={`Date info for ${day.format(
-                                      "MMMM D, YYYY"
-                                    )}`}
-                                  >
-                                    <div className="w-full">
-                                      <span className="flex items-center justify-center text-lg font-bolder">
-                                        {day.format("D")}
-                                      </span>
-                                      <div className=" sm:flex relative mt-4 w-full h-2 ">
-                                        <div
-                                          className={`h-[100%] ${progressColor} rounded-full`}
-                                          // style={{
-                                          //   width: `${percentageBooked}%`,
-                                          // }}
-                                        ></div>
-                                      </div>
-                                    </div>
-                                  </Tooltip>
-                                ) : (
-                                  <Tooltip
-                                    title={
-                                      <div className="p-2">
-                                        <h3 className="text-lg font-bold">
-                                          Date Info
-                                        </h3>
-                                        <p>{`Full Date: ${day.format(
-                                          "YYYY-MM-DD"
-                                        )}`}</p>
-                                        <p>{`Day: ${day.format("dddd")}`}</p>
-                                        {holidays.find(
-                                          (holiday) =>
-                                            holiday.date ===
-                                            day.format("YYYY-MM-DD")
-                                        )?.comment !== null ? (
-                                          <h2 className="text-lg font-bold">
-                                            {
-                                              holidays.find(
-                                                (holiday) =>
-                                                  holiday.date ===
-                                                  day.format("YYYY-MM-DD")
-                                              )?.comment
-                                            }
-                                          </h2>
-                                        ) : (
-                                          <h2 className="text-lg font-bold">
-                                            No Information
-                                          </h2>
-                                        )}
-                                      </div>
-                                    }
-                                    arrow
-                                    aria-label={`Date info for ${day.format(
-                                      "MMMM D, YYYY"
-                                    )}`}
-                                  >
-                                    <div className="w-full">
-                                      <span className="flex items-center justify-center text-lg font-bolder">
-                                        {day.format("D")}
-                                      </span>
-                                      <span className="hidden sm:flex w-full items-center justify-center text-center text-xs lg:text-sm font-bold text-gray-900">
-                                        Holiday
-                                      </span>
-                                    </div>
-                                  </Tooltip>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className=" mt-4 p-3 border border-gray-300">
-                          <div className="flex gap-0 sm:!gap-6">
-                            <div className="border border-gray-300 text-[12px] w-full text-center bg-red-200 h-16 flex justify-center items-center">
-                              Not Available
-                            </div>
-                            <div className="border border-gray-300 text-[12px] w-full text-center bg-green-200 h-16 flex justify-center items-center ">
-                              Available
-                            </div>
-
-                            <div className="border border-gray-300 text-[12px] w-full text-center bg-orange-200 h-16 flex justify-center items-center">
-                              Limited Slots
-                            </div>
-                            <div className="border border-4 !border-blue-600 text-[12px] text-center w-full h-16 flex justify-center items-center">
-                              Selected Slot
-                            </div>
-                            <div className="border border-gray-300 bg-gray-300 text-[12px] text-center w-full h-16 flex justify-center items-center">
-                              Holiday
-                            </div>
-                          </div>
-                        </div>
-                        <div className="mt-3 w-full flex flex-col gap-2 items-start justify-start">
-                          <span className="font-medium ml-2">
-                            **You cannot select previous dates.
-                          </span>
-                          <span className="text-red-500 ml-2">
-                            {formErrors.date}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="w-full md:w-2/3 p-4 !ml-0 md:!ml-4 !mt-3 md:!mt-0 border-2 border-gray-300 rounded-3xl">
-                    {selectedDate !== "" ? (
-                      <h3 className="text-gray-900 text-lg font-medium mb-3 text-center">
-                        {dayjs(selectedDate).format("D - MMMM - YYYY")}
-                      </h3>
-                    ) : (
-                      <h3 className="text-gray-900 text-lg font-medium mb-3 text-center">
-                        Please Select a Date
-                      </h3>
-                    )}
-                    <text className="flex font-medium  text-gray-500 border-b border-gray-400 !w-full justify-center">
-                      Pick a Time
-                    </text>
-                    <div className="grid grid-cols-3 gap-3 mt-4">
-                      {subSlots.length > 0 ? (
-                        subSlots
-                          .filter((item) => {
-                            if (!item.is_active) return false;
-                            if (
-                              selectedDate === today &&
-                              item.start_time <= currentTime
-                            )
-                              return false;
-                            return true;
-                          })
-                          .map((item, index) => {
-                            const isBooked = item.is_booked;
-                            const isSelected = selectedTime === item.id;
-
-                            // Determine the class for each slot
-                            const slotClass = `relative rounded-lg border border-gray-300 h-12 text-[14px] flex justify-center items-center ${
-                              isBooked
-                                ? "bg-gray-500 text-white font-bold cursor-not-allowed"
-                                : isSelected
-                                ? "bg-blue-500 text-white font-bold cursor-pointer"
-                                : "bg-white text-gray-500 font-bold cursor-pointer"
-                            }`;
-
-                            return (
-                              <h2
-                                key={index}
-                                className={slotClass}
-                                onClick={() => {
-                                  if (!isBooked) {
-                                    handleTimeClick(
-                                      item.id,
-                                      item.start_time,
-                                      item.end_time
-                                    );
-                                  }
-                                }}
-                              >
-                                {`${formatTime(item.start_time)} - ${formatTime(
-                                  item.end_time
-                                )}`}
-                              </h2>
-                            );
-                          })
                       ) : (
-                        <div className="col-span-3 self-center justify-self-center">
-                          <p className="text-xl font-medium text-gray-600">
-                            No available slots.
-                          </p>
-                        </div>
+                        <option disabled>Loading locations...</option>
                       )}
-                    </div>
+                    </select>
+                    {formErrors.location && (
+                      <span className="mt-2 block text-sm font-bold text-rose-500">
+                        {formErrors.location}
+                      </span>
+                    )}
+                  </label>
 
-                    <div className="flex flex-col gap-3 mt-8 mb-4">
-                      <div className="flex items-center">
-                        <div className="bg-[#ffffff] border-[2px] rounded-lg border-black w-5 h-5 mr-2"></div>{" "}
-                        :{" "}
-                        <text className="ml-2 font-medium">
-                          Available Slots
-                        </text>
-                      </div>
-                      <div className="flex items-center">
-                        <div className="bg-[#9ca3af] border-[2px] rounded-lg border-black w-5 h-5 mr-2"></div>{" "}
-                        : <text className="ml-2 font-medium">Booked Slots</text>
-                      </div>
-                      <div className="flex items-center">
-                        <div className="bg-blue-500 border-[2px] rounded-lg border-black w-5 h-5 mr-2"></div>{" "}
-                        :{" "}
-                        <text className="ml-2 font-medium">Selected Slot</text>
-                      </div>
-                    </div>
-                    <span className="text-red-500 ml-2 mt-3">
-                      {formErrors.time}
+                  <label className="block">
+                    <span className="mb-2 flex items-center gap-2 text-sm font-black">
+                      <FaHeartPulse className="text-[#0D9488]" />
+                      Department <span className="text-rose-500">*</span>
                     </span>
+                    <select
+                      name="department"
+                      id="department"
+                      value={formData.department}
+                      className="h-14 w-full rounded-2xl border border-[#67E8F9]/60 bg-[#ECFEFF]/70 px-4 text-sm font-bold outline-none transition focus:border-[#0D9488] focus:bg-white focus:ring-4 focus:ring-[#67E8F9]/30"
+                      onChange={handleChange}
+                    >
+                      <option value="">Select a department</option>
+                      {departmentOptions.length > 0 ? (
+                        departmentOptions.map((item) => (
+                          <option key={item.id} value={item.department}>
+                            {item.department}
+                          </option>
+                        ))
+                      ) : (
+                        <option disabled>Select location first</option>
+                      )}
+                    </select>
+                    {formErrors.department && (
+                      <span className="mt-2 block text-sm font-bold text-rose-500">
+                        {formErrors.department}
+                      </span>
+                    )}
+                  </label>
+
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 flex items-center gap-2 text-sm font-black">
+                      <FaUserDoctor className="text-[#0D9488]" />
+                      Doctor <span className="text-rose-500">*</span>
+                    </span>
+                    <select
+                      name="doctor"
+                      id="doctor"
+                      value={formData.username}
+                      className="h-14 w-full rounded-2xl border border-[#67E8F9]/60 bg-[#ECFEFF]/70 px-4 text-sm font-bold outline-none transition focus:border-[#0D9488] focus:bg-white focus:ring-4 focus:ring-[#67E8F9]/30"
+                      onChange={handleChange}
+                    >
+                      <option value="">Select a doctor</option>
+                      {doctorOptions.length > 0 ? (
+                        doctorOptions.map((item) => (
+                          <option key={item.id} value={item.username}>
+                            {item.fname} {item.lname}
+                          </option>
+                        ))
+                      ) : (
+                        <option disabled>Select department first</option>
+                      )}
+                    </select>
+                    {formErrors.doctor && (
+                      <span className="mt-2 block text-sm font-bold text-rose-500">
+                        {formErrors.doctor}
+                      </span>
+                    )}
+                  </label>
+
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-sm font-black">
+                      Describe your issue <span className="text-rose-500">*</span>
+                    </span>
+                    <textarea
+                      name="problem"
+                      value={formData.problem}
+                      className="min-h-[150px] w-full resize-none rounded-2xl border border-[#67E8F9]/60 bg-[#ECFEFF]/70 px-4 py-4 text-sm font-semibold leading-7 outline-none transition focus:border-[#0D9488] focus:bg-white focus:ring-4 focus:ring-[#67E8F9]/30"
+                      placeholder="Briefly describe symptoms, concerns, or the reason for this visit."
+                      onChange={handleChange}
+                    />
+                    {formErrors.problem && (
+                      <span className="mt-2 block text-sm font-bold text-rose-500">
+                        {formErrors.problem}
+                      </span>
+                    )}
+                  </label>
+                </div>
+              </form>
+
+              <aside className="grid gap-6">
+                <div className="overflow-hidden rounded-[2rem] border border-[#67E8F9]/50 bg-white shadow-xl shadow-teal-900/10">
+                  {selectedDoctor ? (
+                    <>
+                      <div className="relative h-64 bg-[#134E4A]">
+                        <img
+                          src={selectedDoctor.image || "/brand/doctor-avatar-teal.png"}
+                          alt={`${selectedDoctor.fname} ${selectedDoctor.lname}`}
+                          className="h-full w-full object-cover"
+                        />
+                        <span className="absolute left-4 top-4 rounded-full bg-[#F59E0B] px-3 py-1 text-xs font-black text-[#134E4A]">
+                          Selected
+                        </span>
+                      </div>
+                      <div className="p-6">
+                        <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                          Specialist
+                        </p>
+                        <h3 className="mt-2 text-2xl font-black">
+                          {selectedDoctor.fname} {selectedDoctor.lname}
+                        </h3>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs font-black">
+                          <span className="rounded-full bg-[#ECFEFF] px-3 py-1">
+                            {selectedDoctor.department}
+                          </span>
+                          <span className="rounded-full bg-[#ECFEFF] px-3 py-1">
+                            {selectedDoctor.yoe || 0} years
+                          </span>
+                          <span className="rounded-full bg-[#F59E0B]/20 px-3 py-1">
+                            ${selectedDoctor.amount || formData.amount || 0}
+                          </span>
+                        </div>
+                        <p className="mt-4 text-sm leading-7 text-[#134E4A]/70">
+                          {selectedDoctor.introduction ||
+                            "Choose a live appointment slot with this specialist."}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-6">
+                      <img
+                        src="/brand/doctor-avatar-teal.png"
+                        alt="Doctor avatar"
+                        className="mx-auto h-28 w-28 rounded-3xl object-cover"
+                      />
+                      <h3 className="mt-5 text-2xl font-black">Doctor preview</h3>
+                      <p className="mt-3 text-sm leading-7 text-[#134E4A]/70">
+                        Select a location, department, and doctor to reveal the
+                        live calendar and available appointment slots.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-[#134E4A] p-6 text-white shadow-xl shadow-teal-900/10">
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-[#67E8F9]">
+                    Review
+                  </p>
+                  <div className="mt-5 space-y-3">
+                    {selectedSummary.map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="flex items-start justify-between gap-4 border-b border-white/10 pb-3 text-sm"
+                      >
+                        <span className="text-cyan-50/65">{label}</span>
+                        <span className="max-w-[55%] text-right font-black">{value}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              )}
+              </aside>
             </div>
-            <div className="flex w-full gap-8 my-12 items-center justify-center container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
-              <Link
-                className="w-1/5 h-[60px] bg-[#1030A4] text-[#ffffff] rounded-[20px] flex items-center justify-center font-inter text-[12px] md:text-[28px] font-medium leading-8 hover:bg-blue-700"
-                to="/"
-              >
-                Back
-              </Link>
-              <button
-                type="button"
-                className="w-1/5 h-[60px] bg-[#F16163] text-[#ffffff] rounded-[20px] flex items-center justify-center font-inter text-[12px] md:text-[28px] font-medium leading-8 hover:bg-red-600"
-                onClick={handlesubmit}
-              >
-                Submit
-              </button>
+          </section>
+
+          {doctor && (
+            <section className="px-5 pb-16 sm:px-8 lg:px-12">
+              <div className="mx-auto grid max-w-7xl gap-6 xl:grid-cols-[0.66fr_0.34fr]">
+                <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-4 shadow-xl shadow-teal-900/10 sm:p-6">
+                  <div className="mb-5 flex items-center justify-between gap-4">
+                    <button
+                      type="button"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ECFEFF] text-[#0D9488] transition hover:bg-[#0D9488] hover:text-white"
+                      onClick={() => setCurrentMonth(currentMonth.subtract(1, "month"))}
+                      aria-label="Previous month"
+                    >
+                      <FaArrowLeft />
+                    </button>
+                    <div className="text-center">
+                      <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                        Calendar
+                      </p>
+                      <h2 className="text-2xl font-black">
+                        {currentMonth.format("MMMM")} {currentMonth.year()}
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ECFEFF] text-[#0D9488] transition hover:bg-[#0D9488] hover:text-white"
+                      onClick={() => setCurrentMonth(currentMonth.add(1, "month"))}
+                      aria-label="Next month"
+                    >
+                      <FaArrowRight />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-2">
+                    {dayNames.map((day) => (
+                      <div
+                        key={day}
+                        className="rounded-xl bg-[#ECFEFF] p-2 text-center text-xs font-black uppercase tracking-wide text-[#0D9488]"
+                      >
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-7 gap-2">
+                    {daysInMonth.map((day, index) => {
+                      if (!day) {
+                        return <div key={index} className="min-h-16 rounded-xl" />;
+                      }
+
+                      const pastDate = dayjs(day).isBefore(dayjs(), "day");
+                      const bookingInfo = getBookingInfo(day);
+                      const isBooked = bookingInfo.total > 0;
+                      const isHolidayDate = isHoliday(day);
+                      const percentageBooked = isBooked
+                        ? Number(((bookingInfo.booked / bookingInfo.total) * 100).toFixed(2))
+                        : 0;
+                      const progressColor = getProgressColor(percentageBooked);
+                      const progressBackground = getProgressBackground(
+                        percentageBooked,
+                        isBooked
+                      );
+                      const isSelected = selectedDate === day.format("YYYY-MM-DD");
+                      const holidayComment =
+                        holidays.find((holiday) => holiday.date === day.format("YYYY-MM-DD"))
+                          ?.comment || "Holiday";
+
+                      return (
+                        <button
+                          key={day.format("YYYY-MM-DD")}
+                          type="button"
+                          disabled={pastDate || isHolidayDate}
+                          title={
+                            isHolidayDate
+                              ? holidayComment
+                              : `${day.format("DD MMM YYYY")} - ${bookingInfo.booked}/${bookingInfo.total} booked`
+                          }
+                          className={`group min-h-16 rounded-2xl border p-2 text-left transition ${
+                            isHolidayDate ? "bg-slate-200 border-slate-300" : progressBackground
+                          } ${
+                            isSelected
+                              ? "bg-[#0D9488] !text-white ring-4 ring-[#67E8F9]/40"
+                              : "text-[#134E4A] hover:-translate-y-0.5 hover:shadow-lg"
+                          } ${
+                            pastDate
+                              ? "cursor-not-allowed opacity-45 hover:translate-y-0 hover:shadow-none"
+                              : ""
+                          }`}
+                          onClick={() => handleDateClick(day)}
+                        >
+                          <span className="block text-base font-black">{day.format("D")}</span>
+                          <span className="mt-1 hidden text-[10px] font-bold uppercase tracking-wide opacity-70 sm:block">
+                            {isHolidayDate ? "Holiday" : `${bookingInfo.total || 0} slots`}
+                          </span>
+                          {!isHolidayDate && !pastDate && (
+                            <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-white/70">
+                              <span
+                                className={`block h-full rounded-full ${progressColor}`}
+                                style={{ width: `${Math.max(percentageBooked, isBooked ? 14 : 8)}%` }}
+                              />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-5 grid gap-2 sm:grid-cols-5">
+                    {legendItems.map(([label, color]) => (
+                      <div
+                        key={label}
+                        className="flex items-center gap-2 rounded-2xl bg-[#ECFEFF] px-3 py-2 text-xs font-black"
+                      >
+                        <span className={`h-3 w-3 rounded-full border ${color}`} />
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-sm font-bold text-[#134E4A]/65">
+                    Previous dates and clinic holidays cannot be selected.
+                  </p>
+                  {formErrors.date && (
+                    <p className="mt-2 text-sm font-bold text-rose-500">{formErrors.date}</p>
+                  )}
+                </div>
+
+                <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-5 shadow-xl shadow-teal-900/10 sm:p-6">
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                      Time slots
+                    </p>
+                    <h2 className="mt-2 text-2xl font-black">
+                      {selectedDate
+                        ? dayjs(selectedDate).format("DD MMMM YYYY")
+                        : "Select a date"}
+                    </h2>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-2">
+                    {visibleSubSlots.length > 0 ? (
+                      visibleSubSlots.map((item) => {
+                        const isBooked = item.is_booked;
+                        const isSelected = selectedTime === item.id;
+
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            disabled={isBooked}
+                            className={`rounded-2xl border px-3 py-4 text-sm font-black transition ${
+                              isBooked
+                                ? "cursor-not-allowed border-slate-300 bg-slate-200 text-slate-500"
+                                : isSelected
+                                ? "border-[#0D9488] bg-[#0D9488] text-white shadow-lg shadow-teal-900/10"
+                                : "border-[#67E8F9]/60 bg-[#ECFEFF] text-[#134E4A] hover:border-[#0D9488] hover:bg-white"
+                            }`}
+                            onClick={() =>
+                              !isBooked &&
+                              handleTimeClick(item.id, item.start_time, item.end_time)
+                            }
+                          >
+                            {`${formatTime(item.start_time)} - ${formatTime(item.end_time)}`}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="col-span-full rounded-3xl border border-dashed border-[#67E8F9]/70 bg-[#ECFEFF]/70 p-8 text-center">
+                        <FaCalendarCheck className="mx-auto text-3xl text-[#0D9488]" />
+                        <p className="mt-3 text-sm font-black">
+                          {selectedDate ? "No available slots for this date." : "Pick a date to view slots."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {formErrors.time && (
+                    <p className="mt-4 text-sm font-bold text-rose-500">{formErrors.time}</p>
+                  )}
+
+                  <div className="mt-6 grid gap-3 text-sm font-bold text-[#134E4A]/75">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full bg-[#ECFEFF] ring-2 ring-[#67E8F9]" />
+                      Available slots
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full bg-slate-300 ring-2 ring-slate-400" />
+                      Already booked
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full bg-[#0D9488] ring-2 ring-[#67E8F9]" />
+                      Selected time
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <section className="px-5 pb-20 sm:px-8 lg:px-12">
+            <div className="mx-auto flex max-w-7xl flex-col gap-3 rounded-[2rem] border border-[#67E8F9]/50 bg-white/90 p-4 shadow-xl shadow-teal-900/10 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                  Final check
+                </p>
+                <p className="mt-1 text-sm font-bold text-[#134E4A]/70">
+                  Review your selected doctor, date, and time before payment.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link
+                  className="inline-flex min-h-12 items-center justify-center rounded-full border border-[#67E8F9]/70 px-6 text-sm font-black text-[#134E4A] transition hover:border-[#0D9488] hover:bg-[#ECFEFF]"
+                  to="/"
+                >
+                  Back
+                </Link>
+                <button
+                  type="button"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#F59E0B] px-7 text-sm font-black text-[#134E4A] shadow-xl shadow-amber-900/10 transition hover:bg-[#67E8F9]"
+                  onClick={handlesubmit}
+                >
+                  Continue to Payment
+                  <FaArrowRight />
+                </button>
+              </div>
             </div>
-          </div>
-        </>
+          </section>
+        </main>
       )}
     </>
   );

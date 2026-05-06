@@ -25,30 +25,8 @@ const AddBlog = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     setIsStaff(Cookies.get("is_staff") === "true");
     getBlogData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const modules = {
-    toolbar: [
-      [{ header: "1" }, { header: "2" }, { font: [] }],
-      [{ list: "ordered" }, { list: "bullet" }],
-      ["bold", "italic", "underline"],
-      ["link"],
-      [{ align: [] }],
-      ["clean"],
-    ],
-  };
-
-  const formats = [
-    "header",
-    "font",
-    "list",
-    "bullet",
-    "bold",
-    "italic",
-    "underline",
-    "link",
-    "align",
-  ];
   const [formData, setFormData] = useState({
     name: "",
     text: "",
@@ -64,7 +42,7 @@ const AddBlog = () => {
     image: null,
   });
   const [error, setError] = useState("");
-  const [file, setFile] = useState(null);
+  const [, setFile] = useState(null);
   const [imageSrc, setImageSrc] = useState("");
   const [blogCategory, setBlogCategory] = useState([]);
 
@@ -166,7 +144,7 @@ const AddBlog = () => {
       setLoading(true);
       window.scrollTo(0, 0);
       try {
-        const response = await axios.post(apiUrl, formData, {
+        await axios.post(apiUrl, formData, {
           headers: {
             Authorization: `Token ${token}`,
             "Content-Type": "multipart/form-data",
@@ -284,7 +262,7 @@ const AddBlog = () => {
       {loading ? (
         <LoaderH />
       ) : (
-        <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+        <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
           {isSuperuser ? (
             <AdminSearch />
           ) : isVendor && !isStaff ? (
@@ -322,11 +300,11 @@ const AddBlog = () => {
             </Breadcrumbs>
           </div>
 
-          <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+          <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
             <div className="flex items-center justify-between">
-              <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+              <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
                 Add Blog
-              </text>
+              </span>
             </div>
             <div>
               <form id="AddBlog" onSubmit={handleSubmit}>
@@ -468,7 +446,7 @@ const AddBlog = () => {
                                   {imageSrc ? (
                                     <img
                                       src={imageSrc}
-                                      alt="Image preview"
+                                      alt="Preview"
                                       style={{
                                         maxWidth: "200px",
                                         maxHeight: "200px",

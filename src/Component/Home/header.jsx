@@ -1,93 +1,107 @@
-import { useState, useEffect, useRef } from "react";
-import { GrClose } from "react-icons/gr";
-import { GiHamburgerMenu } from "react-icons/gi";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppointmentModal from "./appointmentmodal";
 import axios from "axios";
 import BaseUrl from "../../Api/baseurl";
 import Cookies from "js-cookie";
-import { FaUserCircle } from "react-icons/fa";
+import { FaSearch, FaUserCircle } from "react-icons/fa";
+import {
+  FaBars,
+  FaCalendarCheck,
+  FaChevronDown,
+  FaLocationDot,
+  FaXmark,
+} from "react-icons/fa6";
 import Swal from "sweetalert2";
-import { FaSearch } from "react-icons/fa";
-import { GiCancel } from "react-icons/gi";
-import Tooltip from "@mui/material/Tooltip";
+
+const navItems = [
+  { label: "Home", href: "/" },
+  { label: "About", href: "/about" },
+  { label: "Hospitals", href: "/hospitals" },
+  { label: "Services", href: "/services" },
+  { label: "Blog", href: "/blog" },
+  { label: "Doctors", href: "/ourdoctors" },
+];
+
+const defaultLogo = "/brand/carebridge-logo-future.png";
+
+const normalizeLogo = (src) => {
+  if (!src || src.includes(".svg") || src.includes("logo-compact")) {
+    return defaultLogo;
+  }
+  return src;
+};
 
 const Header = () => {
   const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
-  const [activeTab, setActiveTab] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const [data, setData] = useState({ new_logo: "" });
   const [isLogin, setIsLogin] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [details, setDetails] = useState({
-    image: "",
-    name: "",
-  });
-  const [searchQuery, setSearchQuery] = useState("");
+  const [details, setDetails] = useState({ image: "", name: "" });
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
-  // const [isModalOpen, setIsModalOpen] = useState(false);
-  // const [searchQuery, setSearchQuery] = useState("");
-
-  // const handleOpenModal = () => {
-  //   setIsModalOpen(true);
-  // };
-
-  // const handleCloseModal = () => {
-  //   setIsModalOpen(false);
-  // };
-
-  // const handleSearch = () => {
-  //   console.log("Searching for:", searchQuery);
-  //   // You can add your search logic here
-  //   setIsModalOpen(false); // Close modal after search
-  // };
-
-  let Login = Cookies.get("patient_username");
-  const handleTabClick = (tab) => {
-    setActiveTab(window.location.pathname);
-  };
 
   const active = window.location.pathname;
+  const patientUsername = Cookies.get("patient_username");
+  const logoSrc = normalizeLogo(data.new_logo);
 
   const fetchData = async () => {
-    const apiUrl = `${BaseUrl}clinic/logochange/`;
     try {
-      const response = await axios.get(apiUrl, {
-        headers: {
-          "Content-Type": "application/json",
-        },
+      const response = await axios.get(`${BaseUrl}clinic/logochange/`, {
+        headers: { "Content-Type": "application/json" },
       });
-      setData(response.data);
+      setData(response.data || {});
     } catch (error) {
       console.error("Error:", error);
     }
   };
+
   const fetchDetail = async () => {
     const username = Cookies.get("patient_username");
-    const url = `${BaseUrl}clinic/patient-profile/${username}/`;
-    const response = await axios.get(url);
-    setDetails(response.data);
+    if (!username) return;
+
+    try {
+      const response = await axios.get(
+        `${BaseUrl}clinic/patient-profile/${username}/`
+      );
+      setDetails(response.data || {});
+    } catch (error) {
+      console.error("Error:", error);
+    }
   };
+
   const handleLogout = () => {
-    Cookies.remove("patient_token");
-    Cookies.remove("patient_username");
-    Cookies.remove("patient_status");
-    Cookies.remove("staff");
-    Cookies.remove("superuser");
+    [
+      "patient_token",
+      "patient_username",
+      "patient_status",
+      "token",
+      "username",
+      "is_staff",
+      "is_vendor",
+      "is_superuser",
+      "staff",
+      "superuser",
+      "status",
+      "roles",
+      "subroles",
+    ].forEach((name) => Cookies.remove(name));
     setIsLogin(null);
+    setDropdownOpen(false);
+    navigate("/user/login", { replace: true });
   };
+
   useEffect(() => {
-    const patientUsername = Cookies.get("patient_username");
     const token = Cookies.get("patient_token");
-    if (patientUsername !== undefined) {
+    if (patientUsername) {
       setIsLogin(token);
       fetchDetail();
     }
-  }, [Login]);
+  }, [patientUsername]);
 
   useEffect(() => {
     fetchData();
@@ -103,9 +117,6 @@ const Header = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-  setTimeout(() => {
-    setDropdownOpen(false);
-  }, 10000);
 
   const handleBookAppointment = () => {
     const token = Cookies.get("patient_token");
@@ -120,7 +131,7 @@ const Header = () => {
       }).then((result) => {
         if (result.isConfirmed) {
           setModalOpen(true);
-        } else if (result.isDismissed) {
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
           navigate("/user/login");
           setModalOpen(false);
         }
@@ -129,493 +140,320 @@ const Header = () => {
       setModalOpen(true);
     }
   };
-  const handleSearch = async (e) => {
-    setQuery(e.target.value);
-    if (e.target.value.length > 1) {
-      const response = await axios.get(
-        `${BaseUrl}clinic/home-search-staff/?q=${e.target.value}`
-      );
-      setSuggestions(response.data);
+
+  const handleSearch = async (event) => {
+    const nextQuery = event.target.value;
+    setQuery(nextQuery);
+
+    if (nextQuery.length > 1) {
+      try {
+        const response = await axios.get(
+          `${BaseUrl}clinic/home-search-staff/?q=${nextQuery}`
+        );
+        setSuggestions(response.data || []);
+      } catch (error) {
+        console.error("Error:", error);
+        setSuggestions([]);
+      }
     } else {
       setSuggestions([]);
     }
   };
+
+  const closeSearch = () => {
+    setShowSearch(false);
+    setQuery("");
+    setSuggestions([]);
+  };
+
+  const displayName =
+    details.name && details.name !== "N/A"
+      ? details.name.split(" ")[0]
+      : "Patient";
+
   return (
-    <div className="bg-gray-200">
-      <div className="container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
-        <div className="flex items-center justify-between h-24 sm:h-32">
-          {data && (
-            <div className="!w-2/5 md:!w-1/3 lg:!w-1/6">
-              <Link to="/">
-                <img src={data.new_logo} alt="Logo" />
-              </Link>
+    <header className="sticky top-0 z-50 border-b border-[#67E8F9]/40 bg-[#ECFEFF]/80 shadow-sm backdrop-blur-2xl">
+      <div className="hidden overflow-hidden border-b border-[#67E8F9]/30 bg-[#134E4A] text-white lg:block">
+        <div className="care-marquee flex w-max gap-8 py-2 text-xs font-black uppercase tracking-[0.18em] text-cyan-50/85">
+          {[...Array(2)].map((_, group) => (
+            <div key={group} className="flex gap-8">
+              {[
+                "Live appointment slots",
+                "Verified doctors",
+                "Firebase-ready platform",
+                "Clinic + wellness tech",
+                "Guest booking supported",
+              ].map((item) => (
+                <span key={`${group}-${item}`} className="inline-flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#F59E0B]" />
+                  {item}
+                </span>
+              ))}
             </div>
-          )}
-          {/* Navigation links hidden on medium screens */}
+          ))}
+        </div>
+      </div>
 
-          <nav className="hidden lg:flex flex-grow justify-center items-center space-x-5">
-            <Link
-              to="/"
-              onClick={() => handleTabClick("home")}
-              className={`font-medium ${
-                activeTab === "home" || active === "/"
-                  ? "text-blue-800"
-                  : "text-black"
-              }`}
-            >
-              Home
-            </Link>
-            <Link
-              to="/about"
-              onClick={() => handleTabClick("about")}
-              className={`font-medium ${
-                activeTab === "about" || active === "/about"
-                  ? "text-blue-800"
-                  : "text-black"
-              }`}
-            >
-              About Us
-            </Link>
-            <Link
-              to="/services"
-              onClick={() => handleTabClick("services")}
-              className={`font-medium ${
-                activeTab === "services" || active === "/services"
-                  ? "text-blue-800"
-                  : "text-black"
-              }`}
-            >
-              Services
-            </Link>
-            <Link
-              to="/blog"
-              onClick={() => handleTabClick("blog")}
-              className={`font-medium ${
-                activeTab === "blog" || active === "/blog"
-                  ? "text-blue-800"
-                  : "text-black"
-              }`}
-            >
-              Blog
-            </Link>
-            <Link
-              to="/ourdoctors"
-              onClick={() => handleTabClick("ourdoctors")}
-              className={`font-medium ${
-                activeTab === "ourdoctors" || active === "/ourdoctors"
-                  ? "text-blue-800"
-                  : "text-black"
-              }`}
-            >
-              Our Doctors
-            </Link>
-            {/* <button onClick={handleOpenModal} className="text-lg text-gray-700">
-              <FaSearch />
-            </button> */}
-            <div className="flex items-center">
-              <button
-                onClick={() => setShowSearch(!showSearch)}
-                className={`transition-all duration-300 ease-in-out ${
-                  showSearch
-                    ? "translate-x-[115px] xl:translate-x-[195px] z-50"
-                    : ""
-                }`}
-              >
-                {showSearch === false ? (
-                  <Tooltip title="Search">
-                    <FaSearch className="text-lg text-gray-700" />
-                  </Tooltip>
-                ) : (
-                  <GiCancel className="text-lg text-gray-700" />
-                )}
-              </button>
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8 lg:px-12">
+        <Link to="/" className="flex min-w-0 items-center">
+          <img
+            src={logoSrc}
+            alt="CareBridge Clinic Appointments"
+            className="h-12 w-auto object-contain sm:h-14"
+          />
+        </Link>
 
-              {showSearch && (
-                <div className="transition-all duration-300 ease-in-out transform translate-x-0 relative z-40">
+        <nav className="hidden items-center rounded-full border border-[#67E8F9]/50 bg-white/75 p-1 shadow-sm lg:flex">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              to={item.href}
+              className={`rounded-full px-4 py-2 text-sm font-black transition ${
+                active === item.href
+                  ? "bg-[#0D9488] text-white shadow-sm"
+                  : "text-[#134E4A] hover:bg-[#ECFEFF] hover:text-[#0D9488]"
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="hidden items-center gap-3 lg:flex">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowSearch((value) => !value)}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[#67E8F9]/60 bg-white text-[#134E4A] shadow-sm transition hover:border-[#0D9488] hover:text-[#0D9488]"
+              aria-label="Search doctors"
+            >
+              {showSearch ? <FaXmark /> : <FaSearch />}
+            </button>
+            {showSearch && (
+              <div className="absolute right-0 top-14 w-[24rem] overflow-hidden rounded-2xl border border-[#67E8F9]/50 bg-white p-3 shadow-2xl shadow-teal-900/10">
+                <div className="flex items-center gap-2 rounded-xl bg-[#ECFEFF] px-3 py-2">
+                  <FaSearch className="text-[#0D9488]" />
                   <input
                     type="text"
-                    placeholder="Search here!"
+                    placeholder="Search doctors, departments, locations"
                     value={query}
                     onChange={handleSearch}
-                    className="pl-3 pr-8 py-1 w-[150px] xl:w-[230px] ml-[-25px] border border-gray-300 rounded-full focus:outline-none focus:ring-none "
+                    className="w-full bg-transparent text-sm font-semibold text-[#134E4A] outline-none placeholder:text-[#134E4A]/45"
+                    autoFocus
                   />
-                  {suggestions.length > 0 ? (
-                    <div className="absolute top-10 ml-[-20px] bg-white w-[230px] rounded-lg !max-h-60 overflow-y-auto scrollable">
-                      {suggestions.map((staff) => (
-                        <div
-                          key={staff.id}
-                          className="hover:bg-gray-300 rounded-lg"
-                        >
-                          <Link
-                            to={`/profiledoctor/${staff.id}`}
-                            onClick={() => {
-                              setShowSearch(false);
-                              setQuery("");
-                              setSuggestions([]);
-                            }}
-                          >
-                            <div className="p-2 flex items-center gap-2 py-0.5">
-                              <img
-                                src={`${BaseUrl}${staff.image}`}
-                                alt=""
-                                className="h-12 w-12 rounded-full object-cover"
-                              />
-                              <div>
-                                <p className="font-bold">
-                                  Dr.{staff.fname + " " + staff.lname}
-                                </p>
-                                {/* <span className="font-bold ml-2">{staff.department}</span> */}
-                                <p className="font-medium text-xs">
-                                  {staff.location}
-                                </p>
-                              </div>
-                            </div>
-                          </Link>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    query !== "" && (
-                      <div className="absolute top-10 ml-[-20px] bg-white w-[230px] rounded-lg !max-h-60">
-                        <p className="w-full text-center font-semibold text-base text-gray-500 py-2">
-                          No Results Found!!
-                        </p>
-                      </div>
-                    )
-                  )}
                 </div>
-              )}
-            </div>
-          </nav>
-
-          <div className="hidden lg:flex flex-shrink-0">
-            <Link
-              type="button"
-              className="py-2 px-3 bg-[#1030A4] text-white rounded-[5px] hover:bg-blue-700 font-semibold"
-              onClick={handleBookAppointment}
-              data-bs-toggle="modal"
-              data-bs-target="#exampleModal"
-            >
-              Book Appointment
-            </Link>
-          </div>
-
-          <div className="flex flex-col relative" ref={dropdownRef}>
-            <Link onClick={() => setDropdownOpen(!dropdownOpen)} className="">
-              <div className="hidden lg:flex items-center gap-1.5 px-2 bg-white rounded-lg ml-2  py-1.5">
-                {isLogin === null ? (
-                  <>
-                    <FaUserCircle className="text-[35px] text-gray-700" />
-                    {/* <text className="font-bold">Guest</text> */}
-                  </>
-                ) : (
-                  <>
-                    {!details.image ? (
-                      <FaUserCircle className="text-[35px] text-gray-700" />
+                {query && (
+                  <div className="mt-3 max-h-72 overflow-y-auto">
+                    {suggestions.length > 0 ? (
+                      suggestions.map((staff) => (
+                        <Link
+                          key={staff.id}
+                          to={`/profiledoctor/${staff.id}`}
+                          onClick={closeSearch}
+                          className="flex items-center gap-3 rounded-xl p-2 transition hover:bg-[#ECFEFF]"
+                        >
+                          <img
+                            src={
+                              staff.image?.startsWith("/brand/")
+                                ? staff.image
+                                : `${BaseUrl}${staff.image}`
+                            }
+                            alt={`${staff.fname} ${staff.lname}`}
+                            className="h-12 w-12 rounded-xl object-cover"
+                          />
+                          <div>
+                            <p className="font-black text-[#134E4A]">
+                              Dr. {staff.fname} {staff.lname}
+                            </p>
+                            <p className="flex items-center gap-1 text-xs font-semibold text-[#134E4A]/60">
+                              <FaLocationDot />
+                              {staff.department || staff.location}
+                            </p>
+                          </div>
+                        </Link>
+                      ))
                     ) : (
-                      <img
-                        className="h-[35px] w-[35px] rounded-full object-cover"
-                        src={details.image}
-                        alt=""
-                      />
+                      <p className="py-4 text-center text-sm font-semibold text-[#134E4A]/60">
+                        No doctors found
+                      </p>
                     )}
-                    <text className="hidden xl:flex font-bold text-center w-fit">
-                      {details.name === "N/A" ? "Guest" : details.name.split(" ")[0]}
-                      {/* {details.name} */}
-                    </text>
-                  </>
+                  </div>
                 )}
               </div>
-            </Link>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="group relative inline-flex h-11 items-center gap-2 overflow-hidden rounded-full bg-[#0D9488] px-5 text-sm font-black text-white shadow-lg shadow-teal-900/10 transition hover:bg-[#0F766E]"
+            onClick={handleBookAppointment}
+          >
+            <span className="absolute inset-x-2 top-1 h-px origin-left rounded-full bg-[#67E8F9] care-pulse-line" />
+            <FaCalendarCheck />
+            Book
+          </button>
+
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setDropdownOpen((value) => !value)}
+              className="flex h-11 items-center gap-2 rounded-full border border-[#67E8F9]/60 bg-white px-2 text-[#134E4A] shadow-sm transition hover:border-[#0D9488]"
+            >
+              {isLogin && details.image ? (
+                <img
+                  className="h-8 w-8 rounded-full object-cover"
+                  src={details.image}
+                  alt={displayName}
+                />
+              ) : (
+                <FaUserCircle className="text-2xl text-[#0D9488]" />
+              )}
+              <span className="max-w-24 truncate text-sm font-black">
+                {isLogin ? displayName : "Login"}
+              </span>
+              <FaChevronDown className="text-xs" />
+            </button>
             {dropdownOpen && (
-              <div className="mt-1 absolute z-20 right-0 top-[50px] rounded-lg w-48 bg-gray-100 shadow-lg">
+              <div className="absolute right-0 top-14 w-60 overflow-hidden rounded-2xl border border-[#67E8F9]/50 bg-white shadow-2xl shadow-teal-900/10">
                 {isLogin === null ? (
                   <Link
                     to="/user/login"
-                    className="block px-4 py-2 font-semibold text-[#113C54] text-center rounded-lg hover:bg-gray-300"
-                    onClick={() => "myprofile"}
+                    className="block px-4 py-3 text-sm font-black text-[#134E4A] hover:bg-[#ECFEFF]"
+                    onClick={() => setDropdownOpen(false)}
                   >
-                    Login/Register
+                    Login / Register
                   </Link>
                 ) : (
                   <>
-                    <Link
-                      to="/userprofile"
-                      className="block px-4 py-2 font-semibold text-[#113C54] rounded-t-lg hover:bg-gray-300"
-                      onClick={() => "myprofile"}
-                    >
-                      Profile
-                    </Link>
-                    <hr className="text-black-800 border-[2px] mx-4" />
-                    <Link
-                      to="/userappointments"
-                      className="block px-4 py-2 font-semibold text-[#113C54] hover:bg-gray-300"
-                      onClick={() => "myprofile"}
-                    >
-                      Appointments
-                    </Link>
-                    <hr className="text-black-800 border-[2px] mx-4" />
-                    <Link
-                      to="/userdocuments"
-                      className="block px-4 py-2 font-semibold text-[#113C54] hover:bg-gray-300"
-                      onClick={() => "myprofile"}
-                    >
-                      Documents
-                    </Link>
-                    <hr className="text-black-800 border-[2px] mx-4" />
-                    <Link
-                      to="/passwordchange"
-                      className="block px-4 py-2 font-semibold text-[#113C54] hover:bg-gray-300"
-                      onClick={() => "myprofile"}
-                    >
-                      Change Password
-                    </Link>
-                    <hr className="text-black-800 border-[2px] mx-4" />
-                    <Link
-                      to="/user/login"
-                      className="block px-4 py-2 font-semibold text-[#113C54] rounded-b-lg hover:bg-gray-300"
-                      onClick={() => handleLogout()}
+                    {[
+                      ["Profile", "/userprofile"],
+                      ["Appointments", "/userappointments"],
+                      ["Documents", "/userdocuments"],
+                      ["Change Password", "/passwordchange"],
+                    ].map(([label, href]) => (
+                      <Link
+                        key={href}
+                        to={href}
+                        className="block px-4 py-3 text-sm font-black text-[#134E4A] hover:bg-[#ECFEFF]"
+                        onClick={() => setDropdownOpen(false)}
+                      >
+                        {label}
+                      </Link>
+                    ))}
+                    <button
+                      type="button"
+                      className="block w-full px-4 py-3 text-left text-sm font-black text-[#b42318] hover:bg-red-50"
+                      onClick={handleLogout}
                     >
                       Log Out
-                    </Link>
+                    </button>
                   </>
                 )}
               </div>
             )}
           </div>
-          <AppointmentModal modalOpen={modalOpen} setModalOpen={setModalOpen} />
-
-          <div className="lg:hidden flex flex gap-3">
-            <div className=" flex items-center">
-              <button
-                onClick={() => setShowSearch(!showSearch)}
-                className={`${
-                  showSearch
-                    ? "transition-all duration-300 ease-in-out translate-x-[140px] sm:translate-x-[190px] z-50"
-                    : ""
-                }`}
-              >
-                {showSearch === false ? (
-                  <FaSearch className="text-lg text-gray-700" />
-                ) : (
-                  <GiCancel className="text-lg text-gray-700" />
-                )}
-              </button>
-
-              {showSearch && (
-                <div className="transition-all duration-300 ease-in-out transform translate-x-0 relative z-40">
-                  <input
-                    type="text"
-                    placeholder="Search here!"
-                    value={query}
-                    onChange={handleSearch}
-                    className="pl-3 pr-8 py-1 w-[150px] sm:w-[200px] border border-gray-300 rounded-full focus:outline-none focus:ring-none"
-                  />
-                  {suggestions.length > 0 && (
-                    <div className="absolute top-10 ml-[-20px] bg-white w-[230px] rounded-lg">
-                      {suggestions.map((staff) => (
-                        <div
-                          key={staff.id}
-                          className="hover:bg-gray-300 rounded-lg"
-                        >
-                          <Link
-                            to={`/profiledoctor/${staff.id}`}
-                            onClick={() => {
-                              setShowSearch(false);
-                              setQuery("");
-                              setSuggestions([]);
-                            }}
-                          >
-                            <div className="p-2 flex items-center gap-2 py-0.5">
-                              <img
-                                src={`https://doctor-appointment-software.logicspice.com${staff.image}`}
-                                alt=""
-                                className="h-12 w-12 rounded-full"
-                              />
-                              <div>
-                                <p className="font-bold">
-                                  Dr.{staff.fname + " " + staff.lname}
-                                </p>
-                                {/* <span className="font-bold ml-2">{staff.department}</span> */}
-                                <p className="font-medium text-xs">
-                                  {staff.location}
-                                </p>
-                              </div>
-                            </div>
-                          </Link>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="text-xl text-gray-700 hover:text-gray-900 focus:outline-none mr-4"
-            >
-              {showMenu ? <GrClose /> : <GiHamburgerMenu />}
-            </button>
-          </div>
         </div>
-        {/* Mobile menu dropdown */}
-        {showMenu && (
-          <div className="lg:hidden bg-gray-200 shadow-md py-2 px-4">
-            <nav className="flex flex-col space-y-2">
-              <Link
-                to="/"
-                onClick={() => handleTabClick("home")}
-                className={`font-medium ${
-                  activeTab === "home" || active === "/"
-                    ? "text-blue-800"
-                    : "text-black"
-                }`}
-              >
-                Home
-              </Link>
-              <Link
-                to="/about"
-                onClick={() => handleTabClick("about")}
-                className={`font-medium ${
-                  activeTab === "about" || active === "/about"
-                    ? "text-blue-800"
-                    : "text-black"
-                }`}
-              >
-                About Us
-              </Link>
-              <Link
-                to="/services"
-                onClick={() => handleTabClick("services")}
-                className={`font-medium ${
-                  activeTab === "services" || active === "/services"
-                    ? "text-blue-800"
-                    : "text-black"
-                }`}
-              >
-                Services
-              </Link>
-              <Link
-                to="/blog"
-                onClick={() => handleTabClick("blog")}
-                className={`font-medium ${
-                  activeTab === "blog" || active === "/blog"
-                    ? "text-blue-800"
-                    : "text-black"
-                }`}
-              >
-                Blog
-              </Link>
-              <Link
-                to="/ourdoctors"
-                onClick={() => handleTabClick("ourdoctors")}
-                className={`font-medium ${
-                  activeTab === "ourdoctors" || active === "/ourdoctors"
-                    ? "text-blue-800"
-                    : "text-black"
-                }`}
-              >
-                Our Doctors
-              </Link>
-              {isLogin === null ? (
-                <Link
-                  to="/user/login"
-                  className="block px-4 py-2 font-semibold text-[#2c97d1] text-center rounded-lg hover:bg-gray-300"
-                  onClick={() => "myprofile"}
-                >
-                  Login/Register
-                </Link>
-              ) : (
-                <>
-                  <p className="text-[#113C54] text-xl font-bold">
-                    User Settings
-                  </p>
-                  <Link
-                    to="/userprofile"
-                    className="block py-2 font-semibold text-[#2c97d1] rounded-t-lg hover:bg-gray-300"
-                    onClick={() => "myprofile"}
-                  >
-                    Profile
-                  </Link>
-                  <hr className="text-black-800 border-[2px] mr-8" />
-                  <Link
-                    to="/userappointments"
-                    className="block py-2 font-semibold text-[#2c97d1] hover:bg-gray-300"
-                    onClick={() => "myprofile"}
-                  >
-                    Appointments
-                  </Link>
-                  <hr className="text-black-800 border-[2px] mr-8" />
-                  <Link
-                    to="/userdocuments"
-                    className="block py-2 font-semibold text-[#2c97d1] hover:bg-gray-300"
-                    onClick={() => "myprofile"}
-                  >
-                    Documents
-                  </Link>
-                  <hr className="text-black-800 border-[2px] mr-8" />
-                  <Link
-                    to="/passwordchange"
-                    className="block py-2 font-semibold text-[#2c97d1] hover:bg-gray-300"
-                    onClick={() => "myprofile"}
-                  >
-                    Change Password
-                  </Link>
-                  <hr className="text-black-800 border-[2px] mr-8" />
-                  <Link
-                    to="/user/login"
-                    className="block py-2 font-semibold text-[#2c97d1] rounded-b-lg hover:bg-gray-300"
-                    onClick={() => handleLogout()}
-                  >
-                    Log Out
-                  </Link>
-                </>
-              )}
 
-              <button
-                type="button"
-                className="py-2 px-3 bg-[#1030A4] text-white rounded-[5px] hover:bg-blue-700 font-semibold text-center"
-                data-bs-toggle="modal"
-                data-bs-target="#exampleModal"
-                onClick={handleBookAppointment}
-              >
-                Book an Appointment
-              </button>
-            </nav>
-          </div>
-        )}
+        <div className="flex items-center gap-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setShowSearch((value) => !value)}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-[#67E8F9]/60 bg-white text-[#134E4A]"
+            aria-label="Search doctors"
+          >
+            {showSearch ? <FaXmark /> : <FaSearch />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowMenu((value) => !value)}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#134E4A] text-white"
+            aria-label="Toggle menu"
+          >
+            {showMenu ? <FaXmark /> : <FaBars />}
+          </button>
+        </div>
       </div>
-      {/* {isModalOpen && (
-        <div className="fixed inset-0 flex items-baseline justify-center bg-black bg-opacity-50 z-50">
-          <div className="relative bg-white px-3 py-[30px] mt-2 rounded-lg  w-auto z-[100]">
-            <div className="absolute right-1 top-1">
-              <button
-                onClick={handleCloseModal}
-                className="font-bold text-gray-600 hover:text-gray-800"
-              >
-                <GiCancel className="text-xl"/>
-              </button>
-            </div>
 
-            <div className="flex flex space-x-4">
-              <input
-                type="text"
-                placeholder="Enter doctor/department/location"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="px-3 py-2 min-w-[320px] border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={handleSearch}
-                className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                Search
-              </button>
+      {showSearch && (
+        <div className="border-t border-[#67E8F9]/30 bg-white px-5 py-3 lg:hidden">
+          <input
+            type="text"
+            placeholder="Search doctors, departments, locations"
+            value={query}
+            onChange={handleSearch}
+            className="w-full rounded-xl border border-[#67E8F9]/60 bg-[#ECFEFF] px-3 py-2 text-sm font-semibold outline-none focus:border-[#0D9488]"
+          />
+          {query && suggestions.length > 0 && (
+            <div className="mt-3 max-h-72 overflow-y-auto rounded-xl border border-[#67E8F9]/40">
+              {suggestions.map((staff) => (
+                <Link
+                  key={staff.id}
+                  to={`/profiledoctor/${staff.id}`}
+                  onClick={closeSearch}
+                  className="flex items-center gap-3 p-3 hover:bg-[#ECFEFF]"
+                >
+                  <img
+                    src={
+                      staff.image?.startsWith("/brand/")
+                        ? staff.image
+                        : `${BaseUrl}${staff.image}`
+                    }
+                    alt={`${staff.fname} ${staff.lname}`}
+                    className="h-12 w-12 rounded-xl object-cover"
+                  />
+                  <div>
+                    <p className="font-black text-[#134E4A]">
+                      Dr. {staff.fname} {staff.lname}
+                    </p>
+                    <p className="text-xs text-[#134E4A]/60">
+                      {staff.department || staff.location}
+                    </p>
+                  </div>
+                </Link>
+              ))}
             </div>
-          </div>
+          )}
         </div>
-      )} */}
-    </div>
+      )}
+
+      {showMenu && (
+        <div className="border-t border-[#67E8F9]/30 bg-white px-5 py-4 shadow-xl lg:hidden">
+          <nav className="flex flex-col gap-2">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                to={item.href}
+                onClick={() => setShowMenu(false)}
+                className={`rounded-xl px-3 py-3 text-sm font-black ${
+                  active === item.href
+                    ? "bg-[#0D9488] text-white"
+                    : "text-[#134E4A] hover:bg-[#ECFEFF]"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+            <Link
+              to={isLogin ? "/userprofile" : "/user/login"}
+              onClick={() => setShowMenu(false)}
+              className="rounded-xl px-3 py-3 text-sm font-black text-[#134E4A] hover:bg-[#ECFEFF]"
+            >
+              {isLogin ? "My Profile" : "Login / Register"}
+            </Link>
+            <button
+              type="button"
+              className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-[#0D9488] px-5 py-3 text-sm font-black text-white"
+              onClick={handleBookAppointment}
+            >
+              <FaCalendarCheck />
+              Book Appointment
+            </button>
+          </nav>
+        </div>
+      )}
+
+      <AppointmentModal modalOpen={modalOpen} setModalOpen={setModalOpen} />
+    </header>
   );
 };
 

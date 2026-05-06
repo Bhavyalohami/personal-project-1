@@ -9,12 +9,16 @@ import AdminSearch from "../../Component/Admin/adminsearch";
 import DoctorSearch from "../../Component/Doctor/doctorsearch";
 import VendorSearch from "../../Component/Vendor/vendorsearch";
 import Cookies from "js-cookie";
-import { isBefore, startOfToday } from "date-fns";
 import BaseUrl from "../../Api/baseurl";
 import TextField from "@mui/material/TextField";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import { FaArrowRight } from "react-icons/fa";
 import { FaArrowLeft } from "react-icons/fa";
+import {
+  doctorListForCurrentUser,
+  getDoctorDisplayName,
+  isDoctorPanelFromCookies,
+} from "../../utils/doctorPanelAccess";
 let holidays = [];
 const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const ManageHolidays = () => {
@@ -22,20 +26,22 @@ const ManageHolidays = () => {
   const [currentMonth, setCurrentMonth] = useState(dayjs());
   const [selectedDates, setSelectedDates] = useState([]);
   const [comment, setComment] = useState(null);
-  const [hoveredDate, setHoveredDate] = useState(null);
+  const [, setHoveredDate] = useState(null);
   const [slots, setSlots] = useState([]);
-  const [slotsData, setSlotsData] = useState({});
+  const [, setSlotsData] = useState({});
   const [bookings, setBookings] = useState({});
-  const [data, setData] = useState(null);
+  const [, setData] = useState(null);
   const [selectedHoliday, setSelectedHoliday] = useState([]);
   const [Doctorlist, setDoctorlist] = useState([]);
-  const [selectedDoctor, setSelectedDoctor] = useState([]);
+  const [selectedDoctor, setSelectedDoctor] = useState("");
   const name = useRef();
   const doctorlist = useRef([]);
   const username = Cookies.get("username");
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
+  const getActiveDoctorUsername = () =>
+    isDoctorPanelFromCookies() ? username : name.current;
 
   const handleMouseEnter = (day) => {
     if (!holidays.includes(day.format("YYYY-MM-DD"))) {
@@ -72,6 +78,14 @@ const ManageHolidays = () => {
     return days.slice(0, endOfMonth.date() + startDayOfWeek - 1);
   };
   const handledoctorchange = (e) => {
+    if (isDoctorPanelFromCookies()) {
+      name.current = username;
+      setSelectedDoctor(username || "");
+      getData(username);
+      fetchData(username);
+      return;
+    }
+
     const { value } = e.target;
     setSelectedDoctor(value);
     name.current = value;
@@ -83,10 +97,17 @@ const ManageHolidays = () => {
     setIsSuperuser(Cookies.get("is_superuser") === "true");
     setIsStaff(Cookies.get("is_staff") === "true");
     getdoctorlist();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const slotsRef = useRef();
   const getdoctorlist = async () => {
+    if (isDoctorPanelFromCookies()) {
+      setDoctorlist(doctorListForCurrentUser(doctorlist.current, username));
+      doctorlist.current = doctorListForCurrentUser(doctorlist.current, username);
+      return;
+    }
+
     try {
       const token = Cookies.get("token");
       const apiUrl = `${BaseUrl}clinic/doctorlist/`;
@@ -103,6 +124,14 @@ const ManageHolidays = () => {
   };
 
   useEffect(() => {
+    if (isDoctorPanelFromCookies() && username) {
+      name.current = username;
+      getData(username);
+      fetchData(username);
+      setSelectedDoctor(username);
+      return;
+    }
+
     if (
       Doctorlist.length > 0 &&
       Doctorlist.some((doctor) => doctor.username === username)
@@ -113,7 +142,8 @@ const ManageHolidays = () => {
       fetchData(name.current);
       setSelectedDoctor(name.current);
     }
-  }, [Doctorlist, username]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Doctorlist, username, currentMonth]);
 
   const fetchData = async (username) => {
     try {
@@ -236,7 +266,7 @@ const ManageHolidays = () => {
   };
 
   const getProgressColor = (percentage) => {
-    if (percentage == 100) {
+    if (percentage === 100) {
       return "bg-red-500";
     } else if (percentage >= 75) {
       return "bg-orange-500";
@@ -247,7 +277,7 @@ const ManageHolidays = () => {
   };
 
   const getprogresscolor = (percentage) => {
-    if (percentage == 100) {
+    if (percentage === 100) {
       return "bg-red-100";
     } else if (percentage >= 75) {
       return "bg-orange-100";
@@ -334,7 +364,7 @@ const ManageHolidays = () => {
     });
 
     if (result.isConfirmed) {
-      const username = name.current;
+      const username = getActiveDoctorUsername();
       const token = Cookies.get("token");
       const apiUrl = `${BaseUrl}clinic/manageholiday/`;
       const data = {
@@ -353,7 +383,7 @@ const ManageHolidays = () => {
           icon: "success",
           title: "Holiday Added Successfully!",
         });
-        getData(name.current);
+        getData(getActiveDoctorUsername());
         setSelectedDates([]);
         setSelectedHoliday([]);
         setComment(null);
@@ -393,7 +423,7 @@ const ManageHolidays = () => {
       const apiUrl = `${BaseUrl}clinic/manageholiday/`;
       const data = {
         dates: selectedHoliday,
-        username: name.current,
+        username: getActiveDoctorUsername(),
       };
 
       try {
@@ -408,7 +438,7 @@ const ManageHolidays = () => {
           icon: "success",
           title: "Holiday removed Successfully!",
         });
-        getData(name.current);
+        getData(getActiveDoctorUsername());
         setSelectedDates([]);
         setSelectedHoliday([]);
       } catch (error) {
@@ -430,6 +460,9 @@ const ManageHolidays = () => {
   function handleBreadClick(event) {
     event.preventDefault();
   }
+  const doctorOnly = isDoctorPanelFromCookies();
+  const doctorDisplayName = getDoctorDisplayName(Doctorlist, username);
+
   return (
     <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
       {isSuperuser ? (
@@ -457,51 +490,53 @@ const ManageHolidays = () => {
       </div>
       <div className="w-full min-h-screen bg-[#F2F2F2]  py-4 mt-3">
         <div className="flex items-center justify-between px-2 sm:!px-4">
-          <text className="font-nunito-sans text-[22px] sm:text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[22px] sm:text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Manage Holidays
-          </text>
+          </span>
         </div>
         <div className="flex flex-col w-full h-full my-4">
           <div className="mb-4 w-full sm:w-1/2 lg:w-1/3 ml-3">
-            <label
-              htmlFor="doctor"
-              className="block text-md font-medium leading-6 text-gray-900"
-            >
-              Doctor
-              <span className="text-red-500">*</span>
-            </label>
-            <div className="mt-2">
-              <select
-                id="doctor"
-                name="doctor"
-                value={selectedDoctor}
-                onChange={handledoctorchange}
-                disabled={
-                  Doctorlist.length > 0 &&
-                  Doctorlist.some((doctor) => doctor.username === username)
-                    ? true
-                    : false
-                }
-                autoComplete="doctor"
-                className={`block w-full h-9 bg-white rounded-md border-0 pl-2 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600  sm:text-sm sm:leading-6 ${
-                  Doctorlist.length > 0 &&
-                  Doctorlist.some((doctor) => doctor.username === username)
-                    ? "cursor-not-allowed"
-                    : ""
-                }`}
-              >
-                {" "}
-                <option value="">Select a doctor</option>
-                {Doctorlist.length > 0 &&
-                  Doctorlist.map((doctor) => (
-                    <>
-                      <option value={doctor.username}>
-                        {doctor.fname} {doctor.lname}
-                      </option>
-                    </>
-                  ))}
-              </select>
-            </div>
+            {doctorOnly ? (
+              <div className="rounded-2xl border border-[#67E8F9]/50 bg-[#ECFEFF] p-4 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                  Assigned doctor
+                </p>
+                <p className="mt-2 text-lg font-black text-[#134E4A]">
+                  {doctorDisplayName}
+                </p>
+                <p className="mt-1 text-xs font-bold text-[#134E4A]/60">
+                  You can view and update only your own holidays.
+                </p>
+              </div>
+            ) : (
+              <>
+                <label
+                  htmlFor="doctor"
+                  className="block text-md font-medium leading-6 text-gray-900"
+                >
+                  Doctor
+                  <span className="text-red-500">*</span>
+                </label>
+                <div className="mt-2">
+                  <select
+                    id="doctor"
+                    name="doctor"
+                    value={selectedDoctor}
+                    onChange={handledoctorchange}
+                    autoComplete="doctor"
+                    className="block w-full h-9 bg-white rounded-md border-0 pl-2 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  >
+                    <option value="">Select a doctor</option>
+                    {Doctorlist.length > 0 &&
+                      Doctorlist.map((doctor) => (
+                        <option key={doctor.username} value={doctor.username}>
+                          {doctor.fname} {doctor.lname}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </>
+            )}
             <span className="text-red-500 mt-2 text-sm">
               {/* {formErrors.doctor} */}
             </span>

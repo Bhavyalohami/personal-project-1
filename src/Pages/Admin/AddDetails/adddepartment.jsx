@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { PhotoIcon } from "@heroicons/react/24/solid";
 import AdminSearch from "../../../Component/Admin/adminsearch";
 import DoctorSearch from "../../../Component/Doctor/doctorsearch";
 import VendorSearch from "../../../Component/Vendor/vendorsearch";
@@ -10,6 +9,7 @@ import Cookies from "js-cookie";
 import BaseUrl from "../../../Api/baseurl";
 import { useNavigate } from "react-router-dom";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
+import PanelForm from "../../../Component/Panel/PanelForm";
 
 const AddDepartment = () => {
   const navigate = useNavigate();
@@ -29,10 +29,6 @@ const AddDepartment = () => {
     name: "",
     url: "",
   });
-  const [error, setError] = useState("");
-  const [file, setFile] = useState(null);
-  const [imageSrc, setImageSrc] = useState("");
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({
@@ -150,7 +146,7 @@ const AddDepartment = () => {
     event.preventDefault();
   }
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+    <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
       {isSuperuser ? (
         <AdminSearch />
       ) : isVendor && !isStaff ? (
@@ -161,7 +157,7 @@ const AddDepartment = () => {
         <DoctorSearch />
       ) : null}
       <div role="presentation" onClick={handleBreadClick} className="ml-1">
-        <Breadcrumbs separator="›" aria-label="breadcrumb">
+        <Breadcrumbs separator=">" aria-label="breadcrumb">
           <Link
             className="hover:underline"
             color="inherit"
@@ -188,14 +184,12 @@ const AddDepartment = () => {
         </Breadcrumbs>
       </div>
 
-      <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
-        <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
-            Add Department
-          </text>
-        </div>
-        <div>
-          <form id="AddBlog" onSubmit={handleSubmit}>
+      <PanelForm
+        title="Add Department"
+        description="Create a department that can be reused by hospital managers, doctors, and booking flows."
+        onSubmit={handleSubmit}
+        className="mt-3"
+      >
             <div className="space-y-12">
               <div className="pb-2">
                 <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
@@ -248,9 +242,7 @@ const AddDepartment = () => {
                 Cancel
               </Link>
             </div>
-          </form>
-        </div>
-      </div>
+      </PanelForm>
     </div>
   );
 };

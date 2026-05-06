@@ -2,60 +2,79 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { IoIosArrowRoundForward } from "react-icons/io";
 import BaseUrl from "../../Api/baseurl";
+
 const Section2 = () => {
   const [data, setData] = useState([]);
 
   const fetchData = async () => {
     const apiUrl = `${BaseUrl}clinic/latest-services/`;
-    // const token = localStorage.getItem('auth_token')
     try {
       const response = await axios.get(apiUrl, {
         headers: {
-          // Authorization: `Token ${token}`,
           "Content-Type": "application/json",
         },
       });
-      setData(response.data);
+      setData(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Error:", error);
+      setData([]);
     }
   };
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  const services = Array.isArray(data)
+    ? data.filter((item) => item.status === 1).slice(0, 6)
+    : [];
+
   return (
-    <div className="container mx-auto px-4 sm:px-8 lg:px-28 py-8 sm:py-12 md:py-16">
-      <h1 className="font-Satoshi text-3xl font-bold leading-7 text-[#1030A4] text-center">
-        Our Services
-      </h1>
-      <h2 className="font-poppins text-2xl md:text-4xl lg:text-5xl font-semibold leading-9 text-center pt-3 text-[#1E1E1E]">
-        The Best Medical Care
-      </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mt-14 gap-4">
-        {data?.map((i, index) =>
-          i.status === 1 ? (
+    <section className="bg-white px-5 py-16 sm:px-8 lg:px-12">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div className="max-w-2xl">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#0D9488]">
+              Our Services
+            </p>
+            <h2 className="mt-3 text-3xl font-black text-[#134E4A] sm:text-5xl">
+              Medical services made easier to access
+            </h2>
+          </div>
+          <Link
+            to="/services"
+            className="inline-flex items-center gap-2 font-bold text-[#0D9488] hover:text-[#0F766E]"
+          >
+            View all services
+            <IoIosArrowRoundForward className="text-2xl" />
+          </Link>
+        </div>
+        <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {services.map((item) => (
             <Link
               to="/services"
-              key={index}
-              className="flex flex-col bg-white shadow-lg pr-16 pb-16 pt-8 pl-8 rounded-[20px] hover:skew-y-[-2deg]"
+              key={item.id || item.name}
+              className="group rounded-2xl border border-[#67E8F9]/40 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-[#0D9488] hover:shadow-xl hover:shadow-teal-900/10"
             >
-              <div className="bg-[#307BC4] w-[70px] rounded-full p-2.5 flex items-center justify-center">
-                {/* <VscCalendar className="text-[50px] text-[#ffffff]" /> */}
-                <img src={i.image} alt={i.name} className="" />
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-[#CCFBF1] p-3">
+                  <img src={item.image} alt={item.name} className="max-h-9" />
+                </div>
+                <IoIosArrowRoundForward className="text-3xl text-slate-300 transition group-hover:translate-x-1 group-hover:text-[#0D9488]" />
               </div>
-              <p className="font-inter text-lg font-bold leading-8 text-left text-[#274760] mt-3">
-                {i.name}
-              </p>
-              <p className="font-poppins text-base font-normal w-2/3 leading-6 text-left text-[#27476085] mt-2">
-                {i.text}
+              <h3 className="mt-6 text-xl font-black text-[#134E4A]">
+                {item.name}
+              </h3>
+              <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
+                {item.text}
               </p>
             </Link>
-          ) : null
-        )}
+          ))}
+        </div>
       </div>
-    </div>
+    </section>
   );
 };
 

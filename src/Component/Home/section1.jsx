@@ -1,57 +1,56 @@
+import { FaCalendarCheck, FaNotesMedical, FaShieldHeart } from "react-icons/fa6";
 
+const benefits = [
+  {
+    title: "Free Consultation",
+    text: "Get clear guidance before booking and choose the care path that fits your schedule.",
+    icon: <FaNotesMedical />,
+  },
+  {
+    title: "Verified Experts",
+    text: "Browse experienced doctors by location, department, availability, and feedback.",
+    icon: <FaShieldHeart />,
+  },
+  {
+    title: "Easy Follow-Up",
+    text: "Patients can manage appointments, documents, feedback, and profile details in one place.",
+    icon: <FaCalendarCheck />,
+  },
+];
 
 const Section1 = () => {
   return (
-    <div className="container mx-auto mt-0 px-4 md:px-8 md:!mt-[-50px] lg:px-32 xl:px-48  ">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 relative">
-        <div className="mt-20 sm:mt-20 md:mt-0 top-7 flex items-center">
-          <div className=" p-4 md:p-6 ">
-            <p className="font-semibold text-lg leading-loose">Why Choose Us?</p>
-            <p className="text-sm ">
-              We are dedicated to providing exceptional treatments care in a warm and welcoming environment.
-            </p>
-          </div>
+    <section className="bg-[#ECFEFF] px-5 py-14 sm:px-8 lg:px-12">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-8 max-w-2xl">
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#0D9488]">
+            Why Choose Us
+          </p>
+          <h2 className="mt-3 text-3xl font-black text-[#134E4A] sm:text-4xl">
+            Care that feels organized before you arrive
+          </h2>
         </div>
-
-        <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm">
-          <div className="bg-white">
-            <span>
-              <img src="/assets/Home/Section1/icon1.png" alt="Customer Service Icon" />
-            </span>
-            <p className="font-semibold text-md leading-loose">Free Consultation</p>
-            <p className="text-sm md:text-sm line-clamp-3">
-              We offer flexible appointment scheduling and free to accommodate your busy life.
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm">
-          <div className="bg-white">
-            <span>
-              <img src="/assets/Home/Section1/icon2.png" alt="Doctor Icon" />
-            </span>
-            <p className="font-semibold text-md leading-loose">Best Expert</p>
-            <p className="text-sm md:text-sm">
-              Our team of experienced dentists and dental professionals boasts years of expertise in various areas of dentistry.
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm">
-          <div className="bg-white">
-            <span >
-              <img src="/assets/Home/Section1/icon3.png" alt="Rating Icon" />
-            </span>
-            <p className="font-semibold text-md leading-loose">High User Rating</p>
-            <p className="text-sm md:text-sm">
-              We offer the latest techniques and materials for restoring damaged teeth, ensuring your dental health is fully optimized.
-            </p>
-          </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {benefits.map((item) => (
+            <article
+              key={item.title}
+              className="rounded-2xl border border-[#67E8F9]/40 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-teal-900/10"
+            >
+              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-lg bg-[#ECFEFF] text-2xl text-[#0D9488]">
+                {item.icon}
+              </div>
+              <h3 className="text-xl font-black text-[#134E4A]">
+                {item.title}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                {item.text}
+              </p>
+            </article>
+          ))}
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 
 export default Section1;
-

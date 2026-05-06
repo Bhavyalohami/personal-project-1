@@ -1,13 +1,17 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import { FaSearch } from "react-icons/fa";
-import { IoIosFunnel } from "react-icons/io";
-import BaseUrl from "../Api/baseurl";
-import Box from "@mui/material/Box";
 import Rating from "@mui/material/Rating";
-import { useMediaQuery } from "@mui/material";
-import { MdKeyboardArrowDown } from "react-icons/md";
+import BaseUrl from "../Api/baseurl";
+import {
+  FaArrowRight,
+  FaFilter,
+  FaHeartPulse,
+  FaLocationDot,
+  FaMagnifyingGlass,
+  FaSliders,
+  FaUserDoctor,
+} from "react-icons/fa6";
 
 const DoctorListing = () => {
   const [staffData, setStaffData] = useState([]);
@@ -15,302 +19,357 @@ const DoctorListing = () => {
   const [departments, setDepartments] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [selectedRating, setSelectedRating] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selectedRating, setSelectedRating] = useState(null);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(""); // State for search query
-  const [isFilterOpen, setIsFilterOpen] = useState(false); // State to handle the visibility of the filter dropdown on small screens
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   useEffect(() => {
+    const getStaffData = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get(`${BaseUrl}clinic/allstaff`);
+        setStaffData(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error("Error fetching staff data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const getLocation = async () => {
+      try {
+        const response = await axios.get(`${BaseUrl}clinic/managelocation/`);
+        setLocation(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error("Error fetching locations:", error.message);
+      }
+    };
+
+    const getDepartments = async () => {
+      try {
+        const response = await axios.get(`${BaseUrl}clinic/managedepartment`);
+        setDepartments(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error("Error fetching departments:", error.message);
+      }
+    };
+
     getStaffData();
     getLocation();
     getDepartments();
   }, []);
 
-  const getDepartments = async () => {
-    try {
-      const response = await axios.get(`${BaseUrl}clinic/managedepartment`);
-      setDepartments(response.data);
-    } catch (error) {
-      console.error("Error fetching departments:", error.message);
-    }
-  };
-
-  const getLocation = async () => {
-    try {
-      const response = await axios.get(`${BaseUrl}clinic/managelocation/`);
-      setLocation(response.data);
-    } catch (error) {
-      console.error("Error fetching locations:", error.message);
-    }
-  };
-
-  const getStaffData = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(`${BaseUrl}clinic/allstaff`);
-      setStaffData(response.data);
-    } catch (error) {
-      console.error("Error fetching staff data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const isSmallScreen = useMediaQuery("(max-width:600px)");
-  const isMediumScreen = useMediaQuery(
-    "(min-width:600px) and (max-width:960px)"
+  const activeDoctors = useMemo(
+    () => staffData.filter((staff) => staff.status === 1),
+    [staffData]
   );
-  let ratingSize = "large";
 
-  if (isSmallScreen) {
-    ratingSize = "small";
-  } else if (isMediumScreen) {
-    ratingSize = "medium";
-  }
+  const filteredStaffData = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const minRating = selectedRating ? Number(selectedRating) : null;
 
-  const toggleDropdown = () => {
-    setIsDropdownOpen((prev) => !prev);
+    return activeDoctors.filter((staff) => {
+      const isLocationMatch = selectedLocation
+        ? staff.location?.toLowerCase() === selectedLocation.toLowerCase()
+        : true;
+
+      const isDepartmentMatch = selectedDepartment
+        ? staff.department?.toLowerCase() === selectedDepartment.toLowerCase()
+        : true;
+
+      const isRatingMatch = minRating
+        ? Number(staff.average_rating || 0) >= minRating
+        : true;
+
+      const searchableText = [
+        staff.fname,
+        staff.lname,
+        staff.department,
+        staff.location,
+        staff.role,
+        staff.designation,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return (
+        isLocationMatch &&
+        isDepartmentMatch &&
+        isRatingMatch &&
+        (query ? searchableText.includes(query) : true)
+      );
+    });
+  }, [
+    activeDoctors,
+    searchQuery,
+    selectedDepartment,
+    selectedLocation,
+    selectedRating,
+  ]);
+
+  const featuredDoctor = activeDoctors[0];
+  const metricCards = [
+    [activeDoctors.length || "20+", "verified specialists"],
+    [departments.filter((item) => item.status === 1).length || "6", "care departments"],
+    ["24/7", "booking access"],
+  ];
+
+  const clearFilters = () => {
+    setSelectedLocation("");
+    setSelectedDepartment("");
+    setSelectedRating("");
+    setSearchQuery("");
   };
-
-  const handleRatingChange = (event, newValue) => {
-    setSelectedRating(newValue);
-    setIsDropdownOpen(false);
-  };
-
-  // Function to handle search input change
-  const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value.toLowerCase());
-  };
-
-  // Filter staff data based on selected filters
-  const filteredStaffData = staffData.filter((staff) => {
-    const isLocationMatch = selectedLocation
-      ? staff.location.toLowerCase() === selectedLocation.toLowerCase()
-      : true;
-
-    const isDepartmentMatch = selectedDepartment
-      ? staff.department.toLowerCase() === selectedDepartment.toLowerCase()
-      : true;
-
-    const isRatingMatch = selectedRating
-      ? staff.average_rating >= selectedRating
-      : true;
-
-    const isSearchMatch =
-      staff.fname.toLowerCase().includes(searchQuery) ||
-      staff.lname.toLowerCase().includes(searchQuery) ||
-      staff.department.toLowerCase().includes(searchQuery) ||
-      staff.location.toLowerCase().includes(searchQuery) ||
-      staff.role.toLowerCase().includes(searchQuery);
-
-    return (
-      isLocationMatch && isDepartmentMatch && isRatingMatch && isSearchMatch
-    );
-  });
 
   return (
-    <div>
-      <div className="bg-[#F2EFEA] py-6">
-        <p className="font-general-sans text-center lg:!text-start text-4xl font-semibold leading-74.4 tracking-tighter text-[#011632] container mb-4 mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
-          Our Doctors
-        </p>
-        <div className="container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
-          <div className="flex justify-between items-center gap-4 mb-6">
-            <div className="relative flex flex-grow md:w-1/2 lg:w-1/3">
-              <input
-                className="p-2 !pr-8 w-full md:w-3/4 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                type="text"
-                placeholder="Search by Name, Department, Location"
-                value={searchQuery}
-                onChange={handleSearchChange}
-              />
-              <button className={`  absolute right-[10px] md:right-[165px] lg:right-[235px] xl:right-[135px] 2xl:right-[195px] top-3`}>
-                <FaSearch className="text-gray-500 text-lg" />
-              </button>
-            </div>
-
-            <div
-              className={`xl:flex flex-wrap justify-center items-center gap-3 relative`}
-            >
-              <p className="hidden xl:flex items-center justify-center gap-1 font-medium bg-white py-[11px] px-4 rounded-md shadow-md">
-                <IoIosFunnel />
-                {/* Filter */}
-              </p>
-              <div className="w-full flex items-center justify-center xl:hidden ">
-                <button
-                  onClick={() => setIsFilterOpen(!isFilterOpen)} 
-                  className="flex items-center justify-center gap-1 font-medium bg-white py-[11px] px-4 rounded-md shadow-md"
+    <main className="overflow-hidden bg-[#ECFEFF] text-[#134E4A]">
+      <section className="relative px-5 py-12 sm:px-8 lg:px-12">
+        <div className="absolute inset-0 care-scan-grid opacity-40" aria-hidden="true" />
+        <div className="relative mx-auto grid max-w-7xl gap-8 rounded-[2rem] border border-[#67E8F9]/50 bg-white/85 p-6 shadow-2xl shadow-teal-900/10 backdrop-blur lg:grid-cols-[1fr_0.78fr] lg:p-10">
+          <div>
+            <p className="inline-flex items-center gap-2 rounded-full border border-[#67E8F9]/60 bg-[#ECFEFF] px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+              <FaUserDoctor />
+              Specialist network
+            </p>
+            <h1 className="mt-5 max-w-3xl text-4xl font-black leading-tight sm:text-6xl">
+              Find the right doctor without the old waiting-room friction.
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-8 text-[#134E4A]/75">
+              Search by name, department, city, rating, or care focus, then move
+              directly into a live appointment slot.
+            </p>
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              {metricCards.map(([value, label]) => (
+                <div
+                  key={label}
+                  className="rounded-2xl border border-[#67E8F9]/50 bg-white p-4 shadow-sm"
                 >
-                  <IoIosFunnel />
-                  {/* Filter */}
-                </button>
-              </div>
-              <div
-                className={`${
-                  isFilterOpen ? "flex mt-2" : "hidden"
-                } xl:flex flex-col xl:flex-row gap-1 xl:!gap-3 left-[-120px] xl:left-0 absolute xl:!relative z-10`}
-              >
-                {/* {location.length > 0 && ( */}
-                  <select
-                    className="bg-white p-2 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 xl:min-w-[200px]"
-                    value={selectedLocation}
-                    onChange={(e) => setSelectedLocation(e.target.value)}
-                    aria-label="Filter by location"
-                  >
-                    <option value="">Select Location</option>
-                    {location.map(
-                      (loc) =>
-                        loc.status === 1 && (
-                          <option key={loc.id} value={loc.name}>
-                            {loc.name}
-                          </option>
-                        )
-                    )}
-                  </select>
-                 {/* )} */}
-
-                {/* {departments.length > 0 && ( */}
-                  <select
-                    className="bg-white p-2 rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 xl:min-w-[225px]"
-                    value={selectedDepartment}
-                    onChange={(e) => setSelectedDepartment(e.target.value)}
-                    aria-label="Filter by department"
-                  >
-                    <option value="">Select Department</option>
-                    {departments.map(
-                      (dep) =>
-                        dep.status === 1 && (
-                          <option key={dep.id} value={dep.name}>
-                            {dep.name}
-                          </option>
-                        )
-                    )}
-                  </select>
-                {/* )} */}
-
-                {/* Rating Dropdown */}
-                <div className="relative">
-                  <button
-                    className="flex items-center justify-between bg-white p-2 text-start rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full xl:min-w-[190px]"
-                    onClick={toggleDropdown}
-                  >
-                    {selectedRating
-                      ? `Rating: ${selectedRating}`
-                      : "Select Rating"}
-
-                    <MdKeyboardArrowDown className="absolute top-2.5 right-0 text-black text-xl" />
-                  </button>
-
-                  {isDropdownOpen && (
-                    <div className="absolute left-0 right-0 mt-2 bg-white shadow-lg rounded-md z-20">
-                      <div className="py-2 px-2.5">
-                        <div
-                          className="flex items-center space-x-2 cursor-pointer"
-                          onClick={() => {
-                            setSelectedRating(null);
-                            setIsDropdownOpen(false);
-                          }}
-                        >
-                          <span>Select Rating</span>
-                        </div>
-
-                        {[1, 2, 3, 4, 5].map((rating) => (
-                          <div
-                            key={rating}
-                            onClick={() => handleRatingChange(null, rating)}
-                            className="flex items-center justify-between space-x-2 cursor-pointer"
-                          >
-                            <Rating
-                              name={`rating-${rating}`}
-                              value={rating}
-                              size="medium"
-                              readOnly
-                            />
-                            <span>{rating}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <p className="text-2xl font-black text-[#0D9488]">{value}</p>
+                  <p className="mt-1 text-xs font-black uppercase tracking-wide text-[#134E4A]/65">
+                    {label}
+                  </p>
                 </div>
-              </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden rounded-[2rem] border border-[#67E8F9]/50 bg-[#134E4A] shadow-xl shadow-teal-900/10">
+            <img
+              src={featuredDoctor?.image || "/brand/team-care-teal.png"}
+              alt="Featured doctor"
+              className="h-[420px] w-full object-cover opacity-95"
+            />
+            <div className="absolute inset-x-5 bottom-5 rounded-3xl border border-white/50 bg-white/90 p-5 shadow-xl backdrop-blur">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                Featured care
+              </p>
+              <h2 className="mt-2 text-2xl font-black">
+                {featuredDoctor
+                  ? `${featuredDoctor.fname} ${featuredDoctor.lname}`
+                  : "CareBridge Doctors"}
+              </h2>
+              <p className="mt-1 text-sm font-bold text-[#134E4A]/65">
+                {featuredDoctor?.department || "Clinic + wellness technology"}
+              </p>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48 my-12">
-        {loading ? (
-          <div className="text-center py-4 text-lg text-gray-500">
-            Loading doctors...
+      <section className="px-5 pb-8 sm:px-8 lg:px-12">
+        <div className="mx-auto max-w-7xl rounded-[2rem] border border-[#67E8F9]/50 bg-white p-4 shadow-xl shadow-teal-900/10 sm:p-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+            <div className="relative flex-1">
+              <FaMagnifyingGlass className="absolute left-5 top-1/2 -translate-y-1/2 text-[#0D9488]" />
+              <input
+                className="h-14 w-full rounded-full border border-[#67E8F9]/60 bg-[#ECFEFF]/70 pl-12 pr-5 text-sm font-bold outline-none transition placeholder:text-[#134E4A]/45 focus:border-[#0D9488] focus:bg-white focus:ring-4 focus:ring-[#67E8F9]/30"
+                type="text"
+                placeholder="Search by name, department, location"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsFilterOpen((prev) => !prev)}
+              className="inline-flex h-14 items-center justify-center gap-2 rounded-full bg-[#134E4A] px-6 text-sm font-black text-white shadow-lg shadow-teal-900/10 xl:hidden"
+            >
+              <FaFilter />
+              Filters
+            </button>
+
+            <div
+              className={`grid gap-3 ${
+                isFilterOpen ? "grid" : "hidden"
+              } xl:grid xl:grid-cols-[220px_240px_170px_auto]`}
+            >
+              <select
+                className="h-14 rounded-full border border-[#67E8F9]/60 bg-[#ECFEFF]/70 px-5 text-sm font-bold outline-none focus:border-[#0D9488] focus:bg-white focus:ring-4 focus:ring-[#67E8F9]/30"
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                aria-label="Filter by location"
+              >
+                <option value="">All locations</option>
+                {location.map(
+                  (loc) =>
+                    loc.status === 1 && (
+                      <option key={loc.id} value={loc.name}>
+                        {loc.name}
+                      </option>
+                    )
+                )}
+              </select>
+
+              <select
+                className="h-14 rounded-full border border-[#67E8F9]/60 bg-[#ECFEFF]/70 px-5 text-sm font-bold outline-none focus:border-[#0D9488] focus:bg-white focus:ring-4 focus:ring-[#67E8F9]/30"
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                aria-label="Filter by department"
+              >
+                <option value="">All departments</option>
+                {departments.map(
+                  (dep) =>
+                    dep.status === 1 && (
+                      <option key={dep.id} value={dep.name}>
+                        {dep.name}
+                      </option>
+                    )
+                )}
+              </select>
+
+              <select
+                className="h-14 rounded-full border border-[#67E8F9]/60 bg-[#ECFEFF]/70 px-5 text-sm font-bold outline-none focus:border-[#0D9488] focus:bg-white focus:ring-4 focus:ring-[#67E8F9]/30"
+                value={selectedRating}
+                onChange={(e) => setSelectedRating(e.target.value)}
+                aria-label="Filter by rating"
+              >
+                <option value="">Any rating</option>
+                {[5, 4, 3, 2, 1].map((rating) => (
+                  <option key={rating} value={rating}>
+                    {rating}+ stars
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-flex h-14 items-center justify-center gap-2 rounded-full border border-[#67E8F9]/70 px-5 text-sm font-black text-[#134E4A] transition hover:border-[#0D9488] hover:bg-[#ECFEFF]"
+              >
+                <FaSliders />
+                Reset
+              </button>
+            </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-            {filteredStaffData.length > 0 ? (
-              filteredStaffData.map(
-                (staff, index) =>
-                  staff.status === 1 && (
-                    <div
-                      key={index}
-                      className="bg-white shadow-lg rounded-lg overflow-hidden hover:scale-105 hover:shadow-2xl transform transition-all duration-300"
-                    >
-                      <Link to={`/profiledoctor/${staff.id}`}>
-                        <div className="relative">
-                          <img
-                            className="w-full h-56 object-cover"
-                            src={staff.image}
-                            alt={`${staff.fname} ${staff.lname}`}
-                          />
-                        </div>
+        </div>
+      </section>
 
-                        <div className="px-4 py-2">
-                          <p className="text-xl font-semibold text-gray-800">
-                            {staff.fname + " " + staff.lname}
-                          </p>
-                          <p className="text-sm text-gray-600">
+      <section className="px-5 pb-20 sm:px-8 lg:px-12">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                {filteredStaffData.length} matches
+              </p>
+              <h2 className="mt-2 text-3xl font-black sm:text-5xl">
+                Available specialists
+              </h2>
+            </div>
+            <p className="max-w-lg text-sm leading-7 text-[#134E4A]/70">
+              Each profile opens into a live slot picker with reviews, clinic
+              details, and instant booking.
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-10 text-center shadow-xl shadow-teal-900/10">
+              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#67E8F9] border-t-[#0D9488]" />
+              <p className="mt-5 text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                Loading doctors
+              </p>
+            </div>
+          ) : filteredStaffData.length > 0 ? (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredStaffData.map((staff) => (
+                <article
+                  key={staff.id}
+                  className="group overflow-hidden rounded-[2rem] border border-[#67E8F9]/50 bg-white shadow-xl shadow-teal-900/10 transition hover:-translate-y-1 hover:shadow-2xl"
+                >
+                  <Link to={`/profiledoctor/${staff.id}`} className="block">
+                    <div className="relative h-72 overflow-hidden bg-[#134E4A]">
+                      <img
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        src={staff.image || "/brand/doctor-avatar-teal.png"}
+                        alt={`${staff.fname} ${staff.lname}`}
+                      />
+                      <span className="absolute left-4 top-4 rounded-full bg-[#F59E0B] px-3 py-1 text-xs font-black text-[#134E4A]">
+                        ${staff.amount || 0}
+                      </span>
+                    </div>
+
+                    <div className="p-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 className="text-2xl font-black">
+                            {staff.fname} {staff.lname}
+                          </h3>
+                          <p className="mt-1 text-sm font-black text-[#0D9488]">
                             {staff.department}
                           </p>
-                          <p className="text-xs text-gray-500 font-bold mt-1">
-                            Years Of Experience:{" "}
-                            <span className="font-medium">{staff.yoe}</span>
-                          </p>
-                          <p className="text-xs text-gray-500 font-bold mt-1">
-                            Location:{" "}
-                            <span className="font-medium">
-                              {staff.location}
-                            </span>
-                          </p>
-                          <div className="flex w-full justify-between items-center mt-3">
-                            <div className="flex items-center justify-center">
-                              <p className="text-lg font-bold text-blue-800">
-                                $<span className="ml-0.5">{staff.amount}</span>
-                              </p>
-                            </div>
-                            <Box sx={{ "& > legend": { mt: 3 } }}>
-                              <Rating
-                                name="controlled"
-                                value={staff.average_rating}
-                                precision={0.5}
-                                readOnly
-                                size={"medium"}
-                              />
-                            </Box>
-                          </div>
                         </div>
-                      </Link>
+                        <FaArrowRight className="mt-2 text-[#0D9488] transition group-hover:translate-x-1" />
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2 text-xs font-black">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFEFF] px-3 py-1">
+                          <FaLocationDot className="text-[#0D9488]" />
+                          {staff.location}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#ECFEFF] px-3 py-1">
+                          <FaHeartPulse className="text-[#0D9488]" />
+                          {staff.yoe || 0} years
+                        </span>
+                      </div>
+
+                      <div className="mt-5 flex items-center justify-between gap-4">
+                        <Rating
+                          name={`doctor-rating-${staff.id}`}
+                          value={Number(staff.average_rating || 0)}
+                          precision={0.5}
+                          readOnly
+                          size="small"
+                        />
+                        <span className="text-xs font-black uppercase tracking-wide text-[#134E4A]/55">
+                          View profile
+                        </span>
+                      </div>
                     </div>
-                  )
-              )
-            ) : (
-              <div className="text-center py-4 text-lg text-gray-500 col-span-full">
-                No doctors found matching the filter criteria.
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+                  </Link>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-10 text-center shadow-xl shadow-teal-900/10">
+              <FaUserDoctor className="mx-auto text-4xl text-[#0D9488]" />
+              <h3 className="mt-4 text-2xl font-black">No doctors found</h3>
+              <p className="mt-3 text-sm text-[#134E4A]/70">
+                Try a different department, location, rating, or search term.
+              </p>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="mt-6 inline-flex min-h-12 items-center justify-center rounded-full bg-[#0D9488] px-7 text-sm font-black text-white transition hover:bg-[#0F766E]"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+    </main>
   );
 };
 

@@ -1,11 +1,5 @@
-import React, { useState, useEffect } from "react";
-import Box from "@mui/material/Box";
-import {
-  DataGrid,
-  GridToolbarContainer,
-  GridToolbarQuickFilter,
-} from "@mui/x-data-grid";
-import { styled } from "@mui/material/styles";
+import React, { useEffect, useState } from "react";
+import ModernDataGrid, { ModernDataGridToolbar } from "../../Component/Table/ModernDataGrid";
 import AdminSearch from "../../Component/Admin/adminsearch";
 import DoctorSearch from "../../Component/Doctor/doctorsearch";
 import VendorSearch from "../../Component/Vendor/vendorsearch";
@@ -13,39 +7,22 @@ import { MdDelete } from "react-icons/md";
 import { IoMdEye } from "react-icons/io";
 import ServiceModal from "./Viewmodals/viewcontact";
 import Swal from "sweetalert2";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Cookies from "js-cookie";
 import BaseUrl from "../../Api/baseurl";
 import Tooltip from "@mui/material/Tooltip";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 
-const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
-  "& .MuiDataGrid-root": {
-    border: "none",
-  },
-  "& .MuiDataGrid-cell": {
-    borderBottom: "1px solid #e0e0e0",
-  },
-  "& .MuiDataGrid-columnHeaders": {
-    backgroundColor: "#f5f5f5",
-  },
-  "& .MuiDataGrid-footerContainer": {
-    borderTop: "1px solid #e0e0e0",
-  },
-}));
+const StyledDataGrid = ModernDataGrid;
 
-const CustomToolbar = () => (
-  <GridToolbarContainer>
-    <GridToolbarQuickFilter className="pt-2 min-w-[320px]" />
-  </GridToolbarContainer>
-);
+const CustomToolbar = ModernDataGridToolbar;
 
 const ManageContact = () => {
   const [openModal, setOpenModal] = useState(false);
-  const [contacts, setContacts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [, setContacts] = useState([]);
+  const [, setLoading] = useState(true);
+  const [, setError] = useState(null);
   const [selectedService, setSelectedService] = useState(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
@@ -118,6 +95,7 @@ const ManageContact = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     getData();
     handleSubRoles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleOpenModal = (service) => {
@@ -129,8 +107,6 @@ const ManageContact = () => {
     setOpenModal(false);
     setSelectedService(null);
   };
-
-  const data = contacts;
 
   // Defining columns directly inside the component without useMemo
   const columns = [
@@ -157,7 +133,7 @@ const ManageContact = () => {
                 onClick={() => handleOpenModal(params.row)}
                 className="text-[32px]"
               >
-                <IoMdEye className="bg-[#1030A4] p-0.5 text-white rounded" />
+                <IoMdEye className="bg-[#0D9488] p-0.5 text-white rounded" />
               </button>
             </Tooltip>
           )}
@@ -167,7 +143,7 @@ const ManageContact = () => {
                 onClick={() => handleDelete(params.row.id)}
                 className="text-[32px]"
               >
-                <MdDelete className="bg-[#F16163] p-0.5 text-white rounded" />
+                <MdDelete className="bg-[#0D9488] p-0.5 text-white rounded" />
               </button>
             </Tooltip>
           )}
@@ -244,12 +220,12 @@ const ManageContact = () => {
       </div>
       <div className="w-full bg-[#F2F2F2] px-4 py-4 mt-3">
         <div className="flex items-center justify-between pb-4">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Manage Enquiries
-          </text>
+          </span>
         </div>
         <div className="bg-white">
-          <Box sx={{ width: 1 }}>
+          <div className="w-full">
             <StyledDataGrid
               rows={rows}
               columns={columns}
@@ -259,7 +235,7 @@ const ManageContact = () => {
               }}
               pageSizeOptions={[5, 10, 25]}
             />
-          </Box>
+          </div>
         </div>
       </div>
       {selectedService && (

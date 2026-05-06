@@ -150,7 +150,7 @@
 //             ? `${BaseUrl}clinic/admin/`
 //             : `${BaseUrl}clinic/staff-list/${user}/`;
 
-//           const response = await axios.put(url, formDataToSend, {
+//           await axios.put(url, formDataToSend, {
 //             headers: { "Content-Type": "multipart/form-data" },
 //           });
 
@@ -251,7 +251,7 @@
 //     const user = Cookies.get("username");
 
 //     try {
-//       const response = await axios.get(url);
+//       await axios.get(url);
 //       setFormData(response.data);
 //       setExistingImage(response.data.image);
 //     } catch (error) {
@@ -310,7 +310,7 @@
 //     event.preventDefault();
 //   }
 //   return (
-//     <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+//     <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
 //       {isSuperuser ? (
 //         <AdminSearch />
 //       ) : isVendor && !isStaff ? (
@@ -349,10 +349,10 @@
 //           </div>
 
 //       <form id="" onSubmit={handleSubmit}>
-//         <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
-//           <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+//         <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
+//           <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
 //             Edit Profile
-//           </text>
+//           </span>
 
 //           <div className="col-span-full">
 //             <div className=" relative mt-2 flex items-center gap-x-3">
@@ -832,7 +832,6 @@
 
 
 import React, { useState, useEffect } from "react";
-import { PhotoIcon, UserCircleIcon } from "@heroicons/react/24/solid";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -980,6 +979,7 @@ const EditProfile = () => {
       setIsLoading(false);
       console.log("No specific user role detected");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuperuser, isVendor, isStaff]); // Depend on role states
 
   // Handle text input changes
@@ -1107,7 +1107,7 @@ const EditProfile = () => {
         if (confirmationResult.isConfirmed) {
           const url = putProfileUrl();
           if (url) {
-            const response = await axios.put(url, formDataToSend, {
+            await axios.put(url, formDataToSend, {
               headers: { "Content-Type": "multipart/form-data" },
             });
             await fetchData(url);
@@ -1160,7 +1160,7 @@ const EditProfile = () => {
   }
 
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+    <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
       {/* Render search component based on user role */}
       {isSuperuser ? (
         <AdminSearch />
@@ -1201,10 +1201,10 @@ const EditProfile = () => {
 
       {/* Form */}
       <form id="edit-profile-form" onSubmit={handleSubmit}>
-        <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+        <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Edit Profile
-          </text>
+          </span>
 
           {/* Image Upload Section */}
           <div className="col-span-full">

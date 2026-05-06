@@ -23,7 +23,7 @@ const AddService = () => {
     image: "",
   });
   const [error, setError] = useState("");
-  const [file, setFile] = useState(null);
+  const [, setFile] = useState(null);
   const [imageSrc, setImageSrc] = useState("");
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
@@ -208,7 +208,7 @@ const AddService = () => {
     event.preventDefault();
   }
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+    <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
       {isSuperuser ? (
         <AdminSearch />
       ) : isVendor && !isStaff ? (
@@ -246,11 +246,11 @@ const AddService = () => {
         </Breadcrumbs>
       </div>
 
-      <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+      <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Add Service
-          </text>
+          </span>
         </div>
         <div>
           <form id="AddBlog">
@@ -325,7 +325,7 @@ const AddService = () => {
                               {imageSrc ? (
                                 <img
                                   src={imageSrc}
-                                  alt="Image preview"
+                                  alt="Preview"
                                   style={{
                                     maxWidth: "200px",
                                     maxHeight: "200px",

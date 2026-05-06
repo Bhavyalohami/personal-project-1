@@ -1,5 +1,5 @@
 import React, { useEffect, Suspense, lazy } from "react";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Swal from "sweetalert2";
 import axios from "axios";
 import Header from "./Component/Home/header";
@@ -11,6 +11,7 @@ import AddAppointment from "./Pages/Admin/AddDetails/addappointments";
 import EditAppointment from "./Pages/Admin/EditPages/editappointment";
 // import ManageSlots from "./Pages/Admin/manageslots";
 import ProtectedRoute from "./Component/ProtectedRoute";
+import PatientProtectedRoute from "./Component/Auth/PatientProtectedRoute";
 import LoaderH from "./Component/Loader/loader";
 import Home from "./Pages/home";
 import Userdashboard from "./Pages/User/userdashboard";
@@ -24,8 +25,11 @@ const Profile = lazy(() => import("./Pages/User/userprofile"));
 const EditUserProfile = lazy(() => import("./Pages/User/edituserprofile"));
 const UserAppointments = lazy(() => import("./Pages/User/userappointments"));
 const UserDocuments = lazy(() => import("./Pages/User/userdocuments"));
+const UserMessages = lazy(() => import("./Pages/User/usermessages"));
 const PasswordChange = lazy(() => import("./Pages/User/passwordchange"));
 const About = lazy(() => import("./Pages/about"));
+const Hospitals = lazy(() => import("./Pages/hospitals"));
+const HospitalProfile = lazy(() => import("./Pages/hospitalprofile"));
 const DoctorListing = lazy(() => import("./Pages/doctorlisting"))
 const GetDetails = lazy(() => import("./Pages/getdetails"));
 const ContactUs = lazy(() => import("./Pages/contactus"));
@@ -36,7 +40,6 @@ const BlogPage = lazy(() => import("./Component/Blog/blogpage"));
 const DoctorProfile = lazy(() => import("./Pages/doctorprofile"));
 const PrivacyPolicy = lazy(() => import("./Pages/privacypolicy"));
 const TermsofService = lazy(() => import("./Pages/termsofservice"));
-const Error = lazy(() => import("./Component/Home/error"));
 const AdminLogin = lazy(() => import("./Pages/Admin/adminlogin"));
 const DoctorLogin = lazy(() => import("./Pages/Doctor/doctorlogin"));
 const DashBoard = lazy(() => import("./Pages/Admin/dashboard"));
@@ -106,6 +109,10 @@ const ManageContact = lazy(() => import("./Pages/Admin/managecontact"));
 const ManageFeedback = lazy(() => import("./Pages/Admin/managefeedback"));
 const SlotSettings = lazy(() => import("./Pages/Admin/EditPages/slotsettings"));
 const ManageHolidays = lazy(() => import("./Pages/Admin/manageholidays"));
+const Messages = lazy(() => import("./Pages/Admin/messages"));
+const Inventory = lazy(() => import("./Pages/Admin/inventory"));
+const HospitalManager = lazy(() => import("./Pages/Admin/hospitalmanager"));
+const HospitalTests = lazy(() => import("./Pages/Admin/hospitaltests"));
 const UserLogin = lazy(() => import("./Pages/User/userlogin"));
 const UserRegister = lazy(() => import("./Pages/User/userregister"));
 const VendorLogin = lazy(() => import("./Pages/Vendor/vendorlogin"));
@@ -113,12 +120,16 @@ const SetupNotification = lazy(() =>
   import("./Pages/Admin/SetUpNotifications")
 );
 
+const toPublicRoute = (path) => {
+  const base = process.env.PUBLIC_URL || "";
+  return `${base}${path}` || path;
+};
+
 const App = () => {
   const location = useLocation();
   useEffect(() => {
     const url = window.location.href;
-    const baseApi = window.location.origin;
-    
+
     if (url.includes("/authenticate/user")) {
       const username = url.split("/authenticate/user/")[1];
       
@@ -152,7 +163,7 @@ const App = () => {
         }
 
         setTimeout(() => {
-          window.location.href = redirectURL;
+          window.location.href = toPublicRoute(redirectURL);
         }, 2000);
       } else {
         Swal.fire({
@@ -169,7 +180,7 @@ const App = () => {
       });
 
       setTimeout(() => {
-        window.location.href = "/";
+        window.location.href = toPublicRoute("/");
       }, 1000);
     }
   };
@@ -180,6 +191,8 @@ const App = () => {
 
   const isAdminPath = location.pathname.startsWith("/admin");
   const adminLogin = location.pathname.endsWith("/admin/login");
+  const userLogin = location.pathname.endsWith("/user/login");
+  const userRegister = location.pathname.endsWith("/user/register");
   const doctorLogin = location.pathname.endsWith("/doctor/login");
   const isDoctorPath = location.pathname.startsWith("/doctor");
   const isVendorPath = location.pathname.startsWith("/vendor");
@@ -210,56 +223,42 @@ const App = () => {
         </Suspense>
       ) : null}
 
+      {userLogin ? (
+        <Suspense fallback={<LoaderH />}>
+          <Routes>
+            <Route path="/user/login" element={<UserLogin />} />
+          </Routes>
+        </Suspense>
+      ) : null}
+
+      {userRegister ? (
+        <Suspense fallback={<LoaderH />}>
+          <Routes>
+            <Route path="/user/register" element={<UserRegister />} />
+          </Routes>
+        </Suspense>
+      ) : null}
+
       {isDoctorPath &&
       !adminLogin &&
       !doctorLogin &&
       !isAdminPath &&
       !vendorLogin &&
       !isVendorPath ? (
-        <div className="flex flex-col md:flex-row w-full">
+        <div className="doctor-panel-shell min-h-screen w-full bg-[#ECFEFF] text-[#134E4A] md:flex">
           <AdminHeader />
           <Suspense fallback={<LoaderH />}>
             <Routes>
               <Route path="/doctor" element={<ProtectedRoute />}>
                 <Route path="/doctor" element={<DashBoard />} />
-                <Route path="/doctor/logochange" element={<LogoChange />} />
-                <Route
-                  path="/doctor/faviconchange"
-                  element={<FaviconChange />}
-                />
-                <Route
-                  path="/doctor/socialmediaprofiles"
-                  element={<SocialMediaProfiles />}
-                />
-                <Route path="/doctor/timings" element={<Timings />} />
-                <Route path="/doctor/slogantext" element={<SloganText />} />
-                <Route path="/doctor/currencysettings" element={<CurrencySettings />}/>
-                <Route path="/doctor/address" element={<Address />} />
-                <Route path="/doctor/staff" element={<Staff />} />
                 <Route
                   path="/doctor/managepatients"
                   element={<ManagePatients />}
                 />
                 <Route path="/doctor/manageslots" element={<ManageSlots />} />
                 <Route
-                  path="/doctor/blogcategories"
-                  element={<ManageBlogCategories />}
-                />
-                <Route
                   path="/doctor/manageholidays"
                   element={<ManageHolidays />}
-                />
-                <Route
-                  path="/doctor/managelocation"
-                  element={<ManageLocation />}
-                />
-                <Route
-                  path="/doctor/managedepartment"
-                  element={<ManageDepartment />}
-                />
-                <Route
-                  path="/doctor/staff/manageroles/:username"
-                  element={<ManageRoles />}
                 />
                 <Route
                   path="/doctor/manageslots/settings"
@@ -268,23 +267,9 @@ const App = () => {
                 <Route path="/doctor/appointments" element={<Appointments />} />
                 <Route
                   path="/doctor/consultationquery"
-                  element={<ConsultationQuery />}
+                  element={<Navigate to="/doctor" replace />}
                 />
-                <Route
-                  path="/doctor/managecontent"
-                  element={<ManageContent />}
-                />
-                <Route path="/doctor/blogs" element={<Blogs />} />
-                <Route path="/doctor/services" element={<AdminServices />} />
-                <Route path="/doctor/feedback" element={<ManageFeedback />} />
-                <Route
-                  path="/doctor/manageenquiries"
-                  element={<ManageContact />}
-                />
-                <Route
-                  path="/doctor/manageholidays"
-                  element={<ManageHolidays />}
-                />
+                <Route path="/doctor/messages" element={<Messages />} />
                 {/*Patient Details*/}
                 <Route
                   path="/doctor/appointments/patientdetails/:id"
@@ -294,35 +279,9 @@ const App = () => {
                   path="/doctor/appointments/addappointments"
                   element={<AddAppointment />}
                 />
-                <Route path="/doctor/staff/addstaff" element={<AddStaff />} />
-                <Route path="/doctor/blogs/addblogs" element={<AddBlog />} />
-                <Route
-                  path="/doctor/blogcategories/addblogcategory"
-                  element={<AddBlogCategory />}
-                />
-                <Route
-                  path="/doctor/managedepartment/adddepartment"
-                  element={<AddDepartment />}
-                />
-                <Route
-                  path="/doctor/services/addservices"
-                  element={<AddService />}
-                />
-                <Route
-                  path="/doctor/managelocation/addlocation"
-                  element={<AddLocation />}
-                />
-                <Route
-                  path="/doctor/services/editservices/:id"
-                  element={<EditService />}
-                />
                 <Route
                   path="/doctor/appointments/editappointments/:id"
                   element={<EditAppointment />}
-                />
-                <Route
-                  path="/doctor/staff/editstaff/:id"
-                  element={<EditStaff />}
                 />
                 <Route
                   path="/doctor/managepatients/editpatient/:id"
@@ -331,28 +290,6 @@ const App = () => {
                 <Route
                   path="/doctor/managepatients/addpatient"
                   element={<AddPatient />}
-                />
-
-                <Route
-                  path="/doctor/managecontent/editcontent/:slug"
-                  element={<EditContent />}
-                />
-                <Route
-                  path="/doctor/blogs/editblogs/:id"
-                  element={<EditBlog />}
-                />
-                <Route
-                  path="/doctor/blogcategories/editblogcategory/:id"
-                  element={<EditBlogCategory />}
-                />
-
-                <Route
-                  path="/doctor/managedepartment/editdepartment/:id"
-                  element={<EditDepartment />}
-                />
-                <Route
-                  path="/doctor/managelocation/editlocation/:id"
-                  element={<EditLocation />}
                 />
                 <Route path="/doctor/myprofile" element={<MyProfile />} />
                 <Route
@@ -364,6 +301,7 @@ const App = () => {
                   element={<ChangePassword />}
                 />
                 <Route path="/doctor/notification" element={<Notification />} />
+                <Route path="/doctor/*" element={<Navigate to="/doctor" replace />} />
               </Route>
             </Routes>
           </Suspense>
@@ -376,7 +314,7 @@ const App = () => {
       !doctorLogin &&
       !isAdminPath &&
       !vendorLogin ? (
-        <div className="flex flex-col md:flex-row w-full">
+        <div className="doctor-panel-shell vendor-panel-shell min-h-screen w-full bg-[#ECFEFF] text-[#134E4A] md:flex">
           <AdminHeader />
           <Suspense fallback={<LoaderH />}>
             <Routes>
@@ -388,24 +326,28 @@ const App = () => {
                   element={<ManagePatients />}
                 />
                 <Route path="/vendor/appointments" element={<Appointments />} />
+                <Route path="/vendor/messages" element={<Messages />} />
+                <Route path="/vendor/inventory" element={<Inventory />} />
+                <Route path="/vendor/hospital-profile" element={<HospitalManager />} />
+                <Route path="/vendor/tests" element={<HospitalTests />} />
                 <Route
                   path="/vendor/consultationquery"
-                  element={<ConsultationQuery />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route
                   path="/vendor/managecontent"
-                  element={<ManageContent />}
+                  element={<Navigate to="/vendor" replace />}
                 />
-                <Route path="/vendor/blogs" element={<Blogs />} />
+                <Route path="/vendor/blogs" element={<Navigate to="/vendor" replace />} />
                 <Route
                   path="/vendor/blogcategories"
-                  element={<ManageBlogCategories />}
+                  element={<Navigate to="/vendor" replace />}
                 />
-                <Route path="/vendor/services" element={<AdminServices />} />
-                <Route path="/vendor/feedback" element={<ManageFeedback />} />
+                <Route path="/vendor/services" element={<Navigate to="/vendor" replace />} />
+                <Route path="/vendor/feedback" element={<Navigate to="/vendor" replace />} />
                 <Route
                   path="/vendor/manageenquiries"
-                  element={<ManageContact />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route path="/vendor/manageslots" element={<ManageSlots />} />
                 <Route
@@ -418,11 +360,11 @@ const App = () => {
                 />
                 <Route
                   path="/vendor/managelocation"
-                  element={<ManageLocation />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route
                   path="/vendor/managedepartment"
-                  element={<ManageDepartment />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route
                   path="/vendor/staff/manageroles/:username"
@@ -437,19 +379,19 @@ const App = () => {
                 <Route path="/vendor/notification" element={<Notification />} />
 
                 {/* Configuration Pages */}
-                <Route path="/vendor/logochange" element={<LogoChange />} />
+                <Route path="/vendor/logochange" element={<Navigate to="/vendor" replace />} />
                 <Route
                   path="/vendor/faviconchange"
-                  element={<FaviconChange />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route
                   path="/vendor/socialmediaprofiles"
-                  element={<SocialMediaProfiles />}
+                  element={<Navigate to="/vendor" replace />}
                 />
-                <Route path="/vendor/timings" element={<Timings />} />
-                <Route path="/vendor/slogantext" element={<SloganText />} />
-                <Route path="/vendor/address" element={<Address />} />
-                <Route path="/vendor/currencysettings" element={<CurrencySettings />}/>
+                <Route path="/vendor/timings" element={<Navigate to="/vendor" replace />} />
+                <Route path="/vendor/slogantext" element={<Navigate to="/vendor" replace />} />
+                <Route path="/vendor/address" element={<Navigate to="/vendor" replace />} />
+                <Route path="/vendor/currencysettings" element={<Navigate to="/vendor" replace />}/>
 
                 {/*Patient Details*/}
                 <Route
@@ -459,10 +401,10 @@ const App = () => {
 
                 {/* Add Pages   */}
 
-                <Route path="/vendor/blogs/addblogs" element={<AddBlog />} />
+                <Route path="/vendor/blogs/addblogs" element={<Navigate to="/vendor" replace />} />
                 <Route
                   path="/vendor/blogcategories/addblogcategory"
-                  element={<AddBlogCategory />}
+                  element={<Navigate to="/vendor" replace />}
                 />
 
                 <Route path="/vendor/staff/addstaff" element={<AddStaff />} />
@@ -473,7 +415,7 @@ const App = () => {
 
                 <Route
                   path="/vendor/services/addservices"
-                  element={<AddService />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route
                   path="/vendor/appointments/addappointments"
@@ -481,18 +423,18 @@ const App = () => {
                 />
                 <Route
                   path="/vendor/managelocation/addlocation"
-                  element={<AddLocation />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route
                   path="/vendor/managedepartment/adddepartment"
-                  element={<AddDepartment />}
+                  element={<Navigate to="/vendor" replace />}
                 />
 
                 {/* Edit Pages */}
 
                 <Route
                   path="/vendor/services/editservices/:id"
-                  element={<EditService />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route
                   path="/vendor/staff/editstaff/:id"
@@ -504,11 +446,11 @@ const App = () => {
                 />
                 <Route
                   path="/vendor/blogs/editblogs/:id"
-                  element={<EditBlog />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route
                   path="/vendor/blogcategories/editblogcategory/:id"
-                  element={<EditBlogCategory />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route
                   path="/vendor/appointments/editappointments/:id"
@@ -516,11 +458,11 @@ const App = () => {
                 />
                 <Route
                   path="/vendor/managelocation/editlocation/:id"
-                  element={<EditLocation />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route
                   path="/vendor/managedepartment/editdepartment/:id"
-                  element={<EditDepartment />}
+                  element={<Navigate to="/vendor" replace />}
                 />
                 <Route
                   path="/vendor/myprofile/editprofile"
@@ -528,8 +470,9 @@ const App = () => {
                 />
                 <Route
                   path="/vendor/managecontent/editcontent/:slug"
-                  element={<EditContent />}
+                  element={<Navigate to="/vendor" replace />}
                 />
+                <Route path="/vendor/*" element={<Navigate to="/vendor" replace />} />
               </Route>
             </Routes>
           </Suspense>
@@ -543,7 +486,7 @@ const App = () => {
       !vendorLogin &&
       !isVendorPath ? (
         // Admin routes
-        <div className="flex flex-col md:flex-row w-full">
+        <div className="doctor-panel-shell admin-panel-shell min-h-screen w-full bg-[#ECFEFF] text-[#134E4A] md:flex">
           <AdminHeader />
           <Suspense fallback={<LoaderH />}>
             <Routes>
@@ -571,6 +514,10 @@ const App = () => {
                 />
                 <Route path="/admin/services" element={<AdminServices />} />
                 <Route path="/admin/feedback" element={<ManageFeedback />} />
+                <Route path="/admin/messages" element={<Messages />} />
+                <Route path="/admin/inventory" element={<Inventory />} />
+                <Route path="/admin/hospital-profile" element={<HospitalManager />} />
+                <Route path="/admin/tests" element={<HospitalTests />} />
                 <Route
                   path="/admin/staff/manageroles/:username"
                   element={<ManageRoles />}
@@ -707,7 +654,9 @@ const App = () => {
         !doctorLogin &&
         !isDoctorPath &&
         !vendorLogin &&
-        !isVendorPath ? (
+        !isVendorPath &&
+        !userLogin &&
+        !userRegister ? (
         <>
           <Header />
           <Suspense fallback={<LoaderH />}>
@@ -718,18 +667,67 @@ const App = () => {
               />
               <Route path="/user/login" element={<UserLogin />} />
               <Route path="/user/register" element={<UserRegister />} />
-              <Route path="/dashboard" element={<Userdashboard />} />
-              <Route path="/userprofile" element={<Profile />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <PatientProtectedRoute>
+                    <Userdashboard />
+                  </PatientProtectedRoute>
+                }
+              />
+              <Route
+                path="/userprofile"
+                element={
+                  <PatientProtectedRoute>
+                    <Profile />
+                  </PatientProtectedRoute>
+                }
+              />
               <Route
                 path="/userprofile/:username"
-                element={<EditUserProfile />}
+                element={
+                  <PatientProtectedRoute>
+                    <EditUserProfile />
+                  </PatientProtectedRoute>
+                }
               />
-              <Route path="/passwordchange" element={<PasswordChange />} />
-              <Route path="/userappointments" element={<UserAppointments />} />
-              <Route path="/userdocuments" element={<UserDocuments />} />
+              <Route
+                path="/passwordchange"
+                element={
+                  <PatientProtectedRoute>
+                    <PasswordChange />
+                  </PatientProtectedRoute>
+                }
+              />
+              <Route
+                path="/userappointments"
+                element={
+                  <PatientProtectedRoute>
+                    <UserAppointments />
+                  </PatientProtectedRoute>
+                }
+              />
+              <Route
+                path="/userdocuments"
+                element={
+                  <PatientProtectedRoute>
+                    <UserDocuments />
+                  </PatientProtectedRoute>
+                }
+              />
+              <Route
+                path="/messages"
+                element={
+                  <PatientProtectedRoute>
+                    <UserMessages />
+                  </PatientProtectedRoute>
+                }
+              />
 
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />
+              <Route path="/hospitals" element={<Hospitals />} />
+              <Route path="/hospitals/:hospitalId" element={<HospitalProfile />} />
               <Route path="/booking" element={<Booking />} />
               <Route path="/payment" element={<PaymentPage />}/>
               <Route path="/contactus" element={<ContactUs />} />

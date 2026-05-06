@@ -1,17 +1,5 @@
-import * as React from "react";
-import { useState, useEffect } from "react";
-// import { useMovieData } from '@mui/x-data-grid-generator';
-import { Link, useNavigate } from "react-router-dom";
-import Box from "@mui/material/Box";
-import {
-  DataGrid,
-  GridToolbar,
-  GridToolbarContainer,
-  GridToolbarExport,
-  GridToolbarFilterButton,
-  GridToolbarQuickFilter,
-} from "@mui/x-data-grid";
-import { styled } from "@mui/material/styles";
+import React, { useEffect, useState } from "react";
+import ModernDataGrid, { ModernDataGridToolbar } from "../../Component/Table/ModernDataGrid";
 import AdminSearch from "../../Component/Admin/adminsearch";
 import DoctorSearch from "../../Component/Doctor/doctorsearch";
 import VendorSearch from "../../Component/Vendor/vendorsearch";
@@ -25,39 +13,17 @@ import Cookies from "js-cookie";
 import BaseUrl from "../../Api/baseurl";
 import Tooltip from "@mui/material/Tooltip";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
+import { Link, useNavigate } from "react-router-dom";
 
-// Custom styles for DataGrid
-const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
-  "& .MuiDataGrid-root": {
-    border: "none",
-  },
-  "& .MuiDataGrid-cell": {
-    borderBottom: "1px solid #e0e0e0",
-  },
-  "& .MuiDataGrid-columnHeaders": {
-    backgroundColor: "#f5f5f5",
-  },
-  "& .MuiDataGrid-footerContainer": {
-    borderTop: "1px solid #e0e0e0",
-  },
-}));
+const StyledDataGrid = ModernDataGrid;
 
-// Custom Toolbar component
-const CustomToolbar = () => (
-  <GridToolbarContainer>
-    <div className=" ">
-      <GridToolbarQuickFilter className="pt-2 min-w-[320px]" />
-    </div>
-    {/* <GridToolbarFilterButton /> */}
-    {/* <GridToolbarExport /> */}
-  </GridToolbarContainer>
-);
+const CustomToolbar = ModernDataGridToolbar;
 
 export default function ConsultationQuery() {
   const [openModal, setOpenModal] = useState(false);
-  const [query, setQuery] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [, setQuery] = useState([]);
+  const [, setLoading] = useState(true);
+  const [, setError] = useState(null);
   const [selectedQuery, setSelectedQuery] = useState(null);
   const [rows, setRows] = useState([]);
   const navigate = useNavigate();
@@ -131,6 +97,7 @@ export default function ConsultationQuery() {
     setIsVendor(Cookies.get("is_vendor") === "true");
     getData();
     handleSubRoles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleOpenModal = (service) => {
@@ -143,25 +110,26 @@ export default function ConsultationQuery() {
     setSelectedQuery(null);
   };
 
-  const data = query;
-
   // Define columns directly inside the component
   const columns = [
     {
       field: "serialNumber",
       headerName: "Sr.No.",
-      width: 30,
+      minWidth: 90,
+      flex: 0.45,
       renderCell: (params) => <div>{params.row.__serialNumber}</div>,
     },
     // { field: "id", headerName: "ID", width: 50 },
-    { field: "name", headerName: "Name", width: 100 },
-    { field: "email", headerName: "Email", width: 180 },
-    { field: "contact", headerName: "Contact ", width: 100 },
-    { field: "intrest", headerName: "Interests ", width: 150 },
+    { field: "name", headerName: "Name", minWidth: 150, flex: 0.9 },
+    { field: "email", headerName: "Email", minWidth: 230, flex: 1.3 },
+    { field: "contact", headerName: "Contact", minWidth: 145, flex: 0.8 },
+    { field: "intrest", headerName: "Interests", minWidth: 220, flex: 1.1 },
     {
       field: "actions",
       headerName: "Actions",
-      width: 150,
+      minWidth: 180,
+      flex: 0.8,
+      sortable: false,
       renderCell: (params) => (
         <div className="flex space-x-4 items-center content-center justify-start mt-2">
           {subRoles.includes(4) && (
@@ -170,7 +138,7 @@ export default function ConsultationQuery() {
                 onClick={() => handleOpenModal(params.row)}
                 className="text-[32px]  "
               >
-                <IoMdEye className="bg-[#1030A4] p-0.5 text-white rounded" />
+                <IoMdEye className="bg-[#0D9488] p-0.5 text-white rounded" />
               </button>
             </Tooltip>
           )}
@@ -187,7 +155,7 @@ export default function ConsultationQuery() {
                 onClick={() => handleDelete(params.row.id)}
                 className="text-[32px]"
               >
-                <MdDelete className="bg-[#F16163] p-0.5 text-white rounded" />
+                <MdDelete className="bg-[#0D9488] p-0.5 text-white rounded" />
               </button>
             </Tooltip>
           )}
@@ -270,12 +238,12 @@ export default function ConsultationQuery() {
       </div>
       <div className="w-full bg-[#F2F2F2] px-4 py-4 mt-3">
         <div className="flex items-center justify-between pb-4">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Consultation Queries
-          </text>
+          </span>
         </div>
         <div className=" bg-white">
-          <Box sx={{ width: 1 }}>
+          <div className="w-full">
             <StyledDataGrid
               rows={rows}
               columns={columns}
@@ -285,7 +253,7 @@ export default function ConsultationQuery() {
               }}
               pageSizeOptions={[5, 10, 25]}
             />
-          </Box>
+          </div>
         </div>
       </div>
       {selectedQuery && (

@@ -1,755 +1,1014 @@
-import { IoIosMore } from "react-icons/io";
-import * as React from "react";
-import { useState, useEffect, useRef } from "react";
-import { MdEdit } from "react-icons/md";
-import { IoMdEye } from "react-icons/io";
-import { MdDelete } from "react-icons/md";
-import { LocalizationProvider } from "@mui/x-date-pickers";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import {
-  Button,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Checkbox,
-  TextField,
-} from "@mui/material";
-import { TimePicker } from "@mui/x-date-pickers";
-import CalendarSelect from "../../Component/calenderselect";
-import AdminSearch from "../../Component/Admin/adminsearch";
-import DoctorSearch from "../../Component/Doctor/doctorsearch";
-import VendorSearch from "../../Component/Vendor/vendorsearch";
-import { HiArrowTrendingUp, HiArrowTrendingDown } from "react-icons/hi2";
-import _ from "lodash";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  DataGrid,
-  GridToolbar,
-  GridToolbarContainer,
-  GridToolbarExport,
-  GridToolbarFilterButton,
-  GridToolbarQuickFilter,
-} from "@mui/x-data-grid";
-import Box from "@mui/material/Box";
-import { styled } from "@mui/material/styles";
-import ServiceModal from "./Viewmodals/viewcontact";
+import ModernDataGrid from "../../Component/Table/ModernDataGrid";
+import { BarChart } from "@mui/x-charts/BarChart";
+import { PieChart } from "@mui/x-charts/PieChart";
 import Cookies from "js-cookie";
 import axios from "axios";
-import BaseUrl from "../../Api/baseurl";
-import { set } from "date-fns/set";
 import Swal from "sweetalert2";
-import { PieChart } from "@mui/x-charts/PieChart";
-import { BarChart } from "@mui/x-charts/BarChart";
-import { IoArrowForward } from "react-icons/io5";
-const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
-  "& .MuiDataGrid-root": {
-    border: "none",
-  },
-  "& .MuiDataGrid-cell": {
-    borderBottom: "1px solid #e0e0e0",
-  },
-  "& .MuiDataGrid-columnHeaders": {
-    backgroundColor: "#f5f5f5",
-  },
-  "& .MuiDataGrid-footerContainer": {
-    borderTop: "1px solid #e0e0e0",
-  },
-}));
+import {
+  FaArrowTrendUp,
+  FaCalendarCheck,
+  FaClock,
+  FaHospitalUser,
+  FaLocationDot,
+  FaRegCircleCheck,
+  FaShieldHeart,
+  FaUserDoctor,
+  FaUsers,
+} from "react-icons/fa6";
+import BaseUrl from "../../Api/baseurl";
 
-const CustomToolbar = () => (
-  <GridToolbarContainer>
-    <div className=" ">
-      {/* <GridToolbarQuickFilter className='pt-2 min-w-[320px]' /> */}
-    </div>
-    {/* <GridToolbarFilterButton /> */}
-    {/* <GridToolbarExport /> */}
-  </GridToolbarContainer>
-);
+const safeArray = (value) => (Array.isArray(value) ? value : []);
+const safeNumber = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+};
+const toCount = (value) => (Array.isArray(value) ? value.length : safeNumber(value));
+
+const clearPanelCookies = () => {
+  [
+    "is_superuser",
+    "is_vendor",
+    "is_staff",
+    "token",
+    "status",
+    "username",
+    "roles",
+    "subroles",
+  ].forEach((name) => Cookies.remove(name));
+};
+
+const normalizeImage = (src, fallback = "/brand/doctor-avatar-teal.png") => {
+  if (!src || src === "N/A") return fallback;
+  if (src.startsWith("http") || src.startsWith("/brand/")) return src;
+  return src.startsWith("/") ? src : `${BaseUrl}${src}`;
+};
+
+const withSerialNumbers = (items, prefix) =>
+  safeArray(items).map((item, index) => ({
+    ...item,
+    id: item.id || item.appointment_id || `${prefix}-${index}`,
+    __serialNumber: index + 1,
+  }));
+
+const columns = [
+  {
+    field: "serialNumber",
+    headerName: "Sr.",
+    width: 70,
+    renderCell: (params) => <strong>{params.row.__serialNumber}</strong>,
+  },
+  {
+    field: "name",
+    headerName: "Patient",
+    flex: 1,
+    minWidth: 140,
+    renderCell: (params) => params?.row?.name || params?.row?.patient || "Guest patient",
+  },
+  {
+    field: "date",
+    headerName: "Date",
+    flex: 1,
+    minWidth: 120,
+    renderCell: (params) => params?.row?.date || "Not set",
+  },
+  {
+    field: "age",
+    headerName: "Age",
+    width: 90,
+    renderCell: (params) => params?.row?.age || "-",
+  },
+  {
+    field: "time",
+    headerName: "Slot",
+    flex: 1,
+    minWidth: 140,
+    renderCell: (params) => params?.row?.time || params?.row?.slot || "Not set",
+  },
+];
 
 const DashBoard = () => {
-  const [openModal, setOpenModal] = useState(false);
-  const [greeting, setGreeting] = useState("");
-  const [rows, setRows] = useState([]);
-  const [rowss, setRowss] = useState([]);
-  const [count, setCount] = useState("");
-  const [info, setInfo] = useState([]);
-  const [issuperuser, setIsSuperuser] = useState(false);
-  const [isstaff, setIsStaff] = useState(false);
-  const [isVendor, setIsVendor] = useState(false);
-  const [data, setData] = useState([]);
-  const [patient, setPatient] = useState([]);
-  const [appointment, setAppointment] = useState([]);
-  const [doctor, setDoctor] = useState([]);
+  const navigate = useNavigate();
+  const isSuperuser = Cookies.get("is_superuser") === "true";
+  const isVendor = Cookies.get("is_vendor") === "true";
+  const isDoctorPanel = !isSuperuser && !isVendor;
+  const username = Cookies.get("username") || "care-team";
+  const token = Cookies.get("token");
 
-  const [staff, setStaff] = useState([]);
-  const [departments, setDepartments] = useState([]);
-  const [locations, setLocations] = useState([]);
-  const [services, setServices] = useState([]);
-  const [piebooked, setPiebooked] = useState([]);
-  const [piecancelled, setPiecancelled] = useState([]);
-  const [pieavailable, setPieavailable] = useState([]);
-  const [weeklydata, setWeeklydata] = React.useState({
+  const [greeting, setGreeting] = useState("");
+  const [profile, setProfile] = useState({});
+  const [rows, setRows] = useState([]);
+  const [cancelledRows, setCancelledRows] = useState([]);
+  const [counts, setCounts] = useState({
+    appointments: 0,
+    patients: 0,
+    doctors: 0,
+    staff: 0,
+    services: 0,
+  });
+  const [clinicLists, setClinicLists] = useState({
+    staff: [],
+    departments: [],
+    locations: [],
+    services: [],
+  });
+  const [graphCounts, setGraphCounts] = useState({
+    booked: 0,
+    available: 0,
+    cancelled: 0,
+  });
+  const [weeklyData, setWeeklyData] = useState({
     dates: [],
     booked: [],
     available: [],
     cancelled: [],
   });
-  const navigate = useNavigate();
-  let infoData = useRef();
+
+  const basePath = isSuperuser ? "/admin" : isVendor ? "/vendor" : "/doctor";
+  const panelName = isSuperuser
+    ? "Admin command center"
+    : isVendor
+    ? "Vendor clinic hub"
+    : "Doctor workspace";
+  const personName =
+    profile.fname || profile.name || profile.username || username.replaceAll(".", " ");
+
+  const fallbackWeeklyLabels = useMemo(() => {
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - index));
+      return date.toLocaleDateString("en-US", { weekday: "short" });
+    });
+  }, []);
+
+  const weeklyLabels = safeArray(weeklyData.dates).length
+    ? safeArray(weeklyData.dates)
+    : fallbackWeeklyLabels;
+
+  const normalizeSeries = (values) => {
+    const cleaned = safeArray(values).map(safeNumber);
+    if (!cleaned.length) return weeklyLabels.map(() => 0);
+    return weeklyLabels.map((_, index) => safeNumber(cleaned[index]));
+  };
+
+  const bookedSeries = normalizeSeries(weeklyData.booked);
+  const availableSeries = normalizeSeries(weeklyData.available);
+  const cancelledSeries = normalizeSeries(weeklyData.cancelled);
+  const hasWeeklyData = [...bookedSeries, ...availableSeries, ...cancelledSeries].some(
+    (value) => safeNumber(value) > 0,
+  );
+
+  const rawPieData = [
+    { id: 0, value: graphCounts.booked, color: "#0D9488", label: "Booked" },
+    { id: 1, value: graphCounts.available, color: "#67E8F9", label: "Available" },
+    { id: 2, value: graphCounts.cancelled, color: "#F59E0B", label: "Cancelled" },
+  ];
+  const pieTotal = rawPieData.reduce((total, item) => total + safeNumber(item.value), 0);
+  const hasPieData = pieTotal > 0;
+  const pieData =
+    hasPieData
+      ? rawPieData
+      : [{ id: 0, value: 1, color: "#67E8F9", label: "No live data" }];
 
   useEffect(() => {
-    const getGreeting = () => {
-      const currentHour = new Date().getHours();
-      if (currentHour < 12) {
-        return "Good Morning";
-      } else if (currentHour < 16) {
-        return "Good Afternoon";
-      } else {
-        return "Good Evening";
+    const currentHour = new Date().getHours();
+    if (currentHour < 12) {
+      setGreeting("Good Morning");
+    } else if (currentHour < 16) {
+      setGreeting("Good Afternoon");
+    } else {
+      setGreeting("Good Evening");
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      Swal.fire({
+        icon: "warning",
+        title: "Session expired",
+        text: "Please login again.",
+        confirmButtonText: "Login",
+      });
+      clearPanelCookies();
+      navigate(isSuperuser ? "/admin/login" : isVendor ? "/vendor/login" : "/doctor/login", {
+        replace: true,
+      });
+    };
+
+    const fetchDashboard = async () => {
+      if (!token) return;
+
+      try {
+        const response = await axios.get(`${BaseUrl}clinic/booking/`, {
+          params: isDoctorPanel ? { username } : undefined,
+          headers: { Authorization: `Token ${token}` },
+        });
+        const payload = response.data || {};
+        setRows(withSerialNumbers(payload.todays_appointments, "today"));
+        setCancelledRows(withSerialNumbers(payload.cancelled_appointments, "cancelled"));
+        setCounts({
+          appointments: toCount(payload.total_appointments),
+          patients: toCount(payload.total_patients),
+          doctors: toCount(payload.total_doctors),
+          staff: toCount(payload.staff),
+          services: toCount(payload.services),
+        });
+        setClinicLists({
+          staff: safeArray(payload.staff),
+          departments: safeArray(payload.departments),
+          locations: safeArray(payload.locations),
+          services: safeArray(payload.services),
+        });
+      } catch (error) {
+        if (error.response?.status === 401 || error.code === "ERR_BAD_REQUEST") {
+          handleSessionExpired();
+        } else {
+          console.error(error);
+        }
       }
     };
-    setGreeting(getGreeting());
-    getData();
-  }, []);
 
-  useEffect(() => {
-    const Suser = Cookies.get("is_superuser");
-    const Staff = Cookies.get("is_staff");
-    const Vendor = Cookies.get("is_vendor");
-    setIsSuperuser(Cookies.get("is_superuser") === "true");
-    setIsVendor(Cookies.get("is_vendor") === "true");
-    setIsStaff(Cookies.get("is_staff") === "true");
-    getgraphdata();
-    getweeklydata();
+    const fetchWeekly = async () => {
+      if (!token) return;
 
-    if (Suser === "true") {
-      fetchAdminData();
-    } else if (Staff === "true" && Vendor === "false" && Suser === "false") {
-      fetchDoctorData();
-    } else if (Vendor === "true") {
-      fetchVendorData();
-    } else {
-      console.log("No specific user role detected");
-    }
-  }, []);
-
-  const getData = async () => {
-    const token = Cookies.get("token");
-
-    try {
-      let response;
-
-      response = await axios.get(`${BaseUrl}clinic/booking/`, {
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-      });
-      setInfo(response.data);
-      infoData.current = response.data;
-      setDataWithSerialNumbers(response.data.todays_appointments);
-      setDataWithSerialNumberss(response.data.cancelled_appointments);
-      setCount(response.data.total_appointments);
-      setPatient(response.data.total_patients);
-      setAppointment(response.data.total_appointments);
-      setDoctor(response.data.total_doctors);
-      setStaff(response.data.staff);
-      setDepartments(response.data.departments);
-      setLocations(response.data.locations);
-      setServices(response.data.services);
-      // console.log(response.data.staff);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const getweeklydata = async () => {
-    const token = Cookies.get("token");
-
-    try {
-      const response = await axios.get(`${BaseUrl}clinic/weekly-graphs/`, {
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-      });
-      setWeeklydata(response.data);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const getgraphdata = async () => {
-    const token = Cookies.get("token");
-
-    try {
-      const response = await axios.get(`${BaseUrl}clinic/graphs/`, {
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-      });
-      setPiebooked(response.data.confirmed_appointments);
-      setPiecancelled(response.data.cancelled_appointments);
-      setPieavailable(
-        response.data.total_sub_slots - response.data.confirmed_appointments
-      );
-    } catch (error) {
-      console.error(error);
-    }
-  };
-  const fetchAdminData = async () => {
-    const token = Cookies.get("token");
-    const apiUrl = `${BaseUrl}clinic/admin/`;
-
-    try {
-      const response = await axios.get(apiUrl, {
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-      });
-      setData(response.data);
-      // console.log(response.data);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      if (error.code === "ERR_BAD_REQUEST") {
-        Swal.fire({
-          icon: "warning",
-          title: "Session expired. Please login again.",
+      try {
+        const response = await axios.get(`${BaseUrl}clinic/weekly-graphs/`, {
+          headers: { Authorization: `Token ${token}` },
         });
-        Cookies.remove("token");
-        Cookies.remove("username");
-        Cookies.remove("is_superuser");
-        Cookies.remove("is_staff");
-        Cookies.remove("is_vendor");
-        Cookies.remove("status");
-        Cookies.remove("roles");
-        Cookies.remove("subroles");
-        if (issuperuser) {
-          navigate("/admin/login");
-        } else if (isVendor) {
-          navigate("/vendor/login");
-        } else {
-          navigate("/doctor/login");
-        }
-      }
-    }
-  };
-
-  const fetchDoctorData = async () => {
-    const token = Cookies.get("token");
-    const username = Cookies.get("username");
-    const apiUrl = `${BaseUrl}clinic/staff-list/${username}`;
-
-    try {
-      const response = await axios.get(apiUrl, {
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-      });
-      setData(response.data);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    }
-  };
-
-  const fetchVendorData = async () => {
-    const token = Cookies.get("token");
-    const username = Cookies.get("username");
-    const apiUrl = `${BaseUrl}clinic/vendor-profile/${username}`;
-
-    try {
-      const response = await axios.get(apiUrl, {
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-      });
-      setData(response.data);
-      // console.log(response.data);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      if (error.code === "ERR_BAD_REQUEST") {
-        Swal.fire({
-          icon: "warning",
-          title: "Session expired. Please login again.",
+        const payload = response.data || {};
+        setWeeklyData({
+          dates: safeArray(payload.dates),
+          booked: safeArray(payload.booked),
+          available: safeArray(payload.available),
+          cancelled: safeArray(payload.cancelled),
         });
-        Cookies.remove("token");
-        Cookies.remove("username");
-        Cookies.remove("is_superuser");
-        Cookies.remove("is_staff");
-        Cookies.remove("is_vendor");
-        Cookies.remove("status");
-        Cookies.remove("roles");
-        Cookies.remove("subroles");
-        if (issuperuser) {
-          navigate("/admin/login");
-        } else if (isVendor) {
-          navigate("/vendor/login");
-        } else {
-          navigate("/doctor/login");
-        }
+      } catch (error) {
+        console.error(error);
       }
-    }
-  };
+    };
 
-  const setDataWithSerialNumbers = (data) => {
-    const dataWithSerialNumbers = data.map((item, index) => ({
-      ...item,
-      __serialNumber: index + 1,
-    }));
-    setRows(dataWithSerialNumbers);
-  };
+    const fetchGraph = async () => {
+      if (!token) return;
 
-  const setDataWithSerialNumberss = (data) => {
-    const sortedData = _.orderBy(data, ["date"], ["asc"]);
-    const dataWithSerialNumbers = data.map((item, index) => ({
-      ...item,
-      __serialNumber: index + 1,
-    }));
-    setRowss(dataWithSerialNumbers);
-  };
+      try {
+        const response = await axios.get(`${BaseUrl}clinic/graphs/`, {
+          headers: { Authorization: `Token ${token}` },
+        });
+        const payload = response.data || {};
+        const booked = safeNumber(payload.confirmed_appointments);
+        const cancelled = safeNumber(payload.cancelled_appointments);
+        const available = Math.max(safeNumber(payload.total_sub_slots) - booked, 0);
+        setGraphCounts({ booked, available, cancelled });
+      } catch (error) {
+        console.error(error);
+      }
+    };
 
-  const columns = [
+    const fetchProfile = async () => {
+      if (!token) return;
+
+      const profileUrl = isSuperuser
+        ? `${BaseUrl}clinic/admin/`
+        : isVendor
+        ? `${BaseUrl}clinic/vendor-profile/${username}`
+        : `${BaseUrl}clinic/staff-list/${username}`;
+
+      try {
+        const response = await axios.get(profileUrl, {
+          headers: { Authorization: `Token ${token}` },
+        });
+        setProfile(response.data || {});
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchDashboard();
+    fetchWeekly();
+    fetchGraph();
+    fetchProfile();
+  }, [isDoctorPanel, isSuperuser, isVendor, navigate, token, username]);
+
+  const statCards = [
     {
-      field: "serialNumber",
-      headerName: "Sr. No.",
-      width: 70,
-      // height: 50,
-      renderCell: (params) => <div>{params.row.__serialNumber}</div>,
+      label: "Today visits",
+      value: counts.appointments,
+      icon: FaCalendarCheck,
+      tone: "bg-[#0D9488] text-white",
+      href: `${basePath}/appointments`,
     },
-    // { field: 'id', headerName: 'ID', width: 90 },
-    { field: "name", headerName: "Patient Name", width: 130 },
-    { field: "date", headerName: "Date", width: 100 },
-    { field: "age", headerName: "Age", width: 60 },
-    { field: "time", headerName: "Slot", width: 120 },
+    {
+      label: "Patients",
+      value: counts.patients,
+      icon: FaHospitalUser,
+      tone: "bg-white text-[#134E4A]",
+      href: `${basePath}/managepatients`,
+    },
+    {
+      label: "Doctors",
+      value: counts.doctors,
+      icon: FaUserDoctor,
+      tone: "bg-white text-[#134E4A]",
+      href: isSuperuser ? "/admin/staff" : `${basePath}/staff`,
+    },
+    {
+      label: "Team members",
+      value: counts.staff,
+      icon: FaUsers,
+      tone: "bg-white text-[#134E4A]",
+      href: `${basePath}/staff`,
+    },
+    {
+      label: "Services",
+      value: counts.services,
+      icon: FaShieldHeart,
+      tone: "bg-white text-[#134E4A]",
+      href: `${basePath}/services`,
+    },
   ];
 
-  return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
-      {issuperuser ? (
-        <AdminSearch />
-      ) : isVendor && !isstaff ? (
-        <VendorSearch />
-      ) : isVendor && isstaff ? (
-        <DoctorSearch />
-      ) : isstaff && !isVendor ? (
-        <DoctorSearch />
-      ) : null}
+  const listCards = [
+    {
+      title: "Departments",
+      items: clinicLists.departments.map((item) => item.name || item.department),
+    },
+    {
+      title: "Locations",
+      items: clinicLists.locations.map((item) => item.name || item.location),
+    },
+    {
+      title: "Services",
+      items: clinicLists.services.map((item) => item.name || item.service),
+    },
+  ];
 
-      <div className="flex flex-col lg:flex-row  px-2 py-6">
-        <div className="w-full bg-[#ffffff]  ">
-          <div className="relative ">
-            <img
-              src="/assets/Admin/Dashboard/image1.png"
-              className=" w-full h-[240px] lg:h-[380px]"
-              alt=""
-            />
-            {data && (
-              <div className="absolute top-[30px] ml-8 font-semibold text-white text-xl lg:text-3xl">
-                {greeting}{" "}
-                <span className=" text-3xl lg:text-5xl font-bold">
-                  {data.fname}
+  const nextAppointment = rows[0];
+  const doctorStats = [
+    {
+      label: "Today's patients",
+      value: counts.appointments,
+      icon: FaCalendarCheck,
+      href: "/doctor/appointments",
+    },
+    {
+      label: "Active patients",
+      value: counts.patients,
+      icon: FaHospitalUser,
+      href: "/doctor/managepatients",
+    },
+    {
+      label: "Open slots",
+      value: graphCounts.available,
+      icon: FaClock,
+      href: "/doctor/manageslots",
+    },
+    {
+      label: "Cancelled",
+      value: graphCounts.cancelled,
+      icon: FaShieldHeart,
+      href: "/doctor/appointments",
+    },
+  ];
+  const doctorActions = [
+    ["Appointments", "/doctor/appointments", FaCalendarCheck],
+    ["Manage Slots", "/doctor/manageslots", FaClock],
+    ["Holidays", "/doctor/manageholidays", FaRegCircleCheck],
+    ["My Profile", "/doctor/myprofile", FaUserDoctor],
+  ];
+  const vendorStats = [
+    {
+      label: "Appointments",
+      value: counts.appointments,
+      icon: FaCalendarCheck,
+      href: "/vendor/appointments",
+    },
+    {
+      label: "Patients",
+      value: counts.patients,
+      icon: FaHospitalUser,
+      href: "/vendor/managepatients",
+    },
+    {
+      label: "Clinic staff",
+      value: counts.staff,
+      icon: FaUsers,
+      href: "/vendor/staff",
+    },
+    {
+      label: "Services",
+      value: counts.services,
+      icon: FaShieldHeart,
+      href: "/vendor/services",
+    },
+  ];
+  const vendorActions = [
+    ["Appointments", "/vendor/appointments", FaCalendarCheck],
+    ["Clinic Staff", "/vendor/staff", FaUsers],
+    ["Manage Slots", "/vendor/manageslots", FaClock],
+    ["Services", "/vendor/services", FaShieldHeart],
+    ["Content", "/vendor/managecontent", FaRegCircleCheck],
+    ["My Profile", "/vendor/myprofile", FaUserDoctor],
+  ];
+  const careBasePath = isVendor ? "/vendor" : "/doctor";
+  const carePanelLabel = isVendor ? "Vendor clinic hub" : "Doctor workspace";
+  const carePanelIntro = isVendor
+    ? "Clinic operations, care teams, content, slots, and patient movement are grouped for fast daily coordination."
+    : "Your clinic queue, slots, and patient follow-ups are grouped for quick daily movement.";
+  const careStats = isVendor ? vendorStats : doctorStats;
+  const careActions = isVendor ? vendorActions : doctorActions;
+  const careAvatarFallback = isVendor
+    ? "/brand/logo-mark-generated-teal.png"
+    : "/brand/doctor-avatar-teal.png";
+
+  if (isDoctorPanel || isVendor) {
+    return (
+      <main className="min-h-screen w-full overflow-hidden bg-[#F7FFFF] px-4 py-5 text-[#134E4A] sm:px-6 lg:px-8">
+        <div className="w-full">
+          <section className="grid gap-5 xl:grid-cols-[1fr_360px]">
+            <div className="relative overflow-hidden rounded-[1.75rem] border border-[#67E8F9]/45 bg-white p-6 shadow-xl shadow-teal-900/8 lg:p-7">
+              <div className="absolute right-0 top-0 h-40 w-40 rounded-bl-full bg-[#67E8F9]/20" />
+              <div className="relative">
+                <div className="flex items-center gap-4">
+                  <img
+                    src={normalizeImage(profile.image, careAvatarFallback)}
+                    alt={personName}
+                    className="h-20 w-20 rounded-[1.5rem] border border-[#67E8F9]/50 object-cover"
+                  />
+                  <div>
+                    <p className="inline-flex items-center gap-2 rounded-full bg-[#ECFEFF] px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-[#0D9488]">
+                      <FaRegCircleCheck />
+                      {carePanelLabel}
+                    </p>
+                    <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl xl:text-5xl">
+                      {greeting}, {personName}
+                    </h1>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[#134E4A]/65">
+                      {carePanelIntro}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {careActions.map(([label, href, Icon]) => (
+                    <Link
+                      key={href}
+                      to={href}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#67E8F9]/50 bg-[#ECFEFF] px-4 text-xs font-black text-[#134E4A] transition hover:border-[#0D9488] hover:bg-white hover:text-[#0D9488]"
+                    >
+                      <Icon className="text-[#0D9488]" />
+                      {label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-[#67E8F9]/45 bg-[#134E4A] p-6 text-white shadow-xl shadow-teal-900/12">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#67E8F9]">
+                {isVendor ? "Next clinic booking" : "Next in queue"}
+              </p>
+              {nextAppointment ? (
+                <div className="mt-5">
+                  <p className="text-3xl font-black">
+                    {nextAppointment.name || nextAppointment.patient || "Guest patient"}
+                  </p>
+                  <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-2xl bg-white/10 p-3">
+                      <p className="text-cyan-50/60">Date</p>
+                      <p className="mt-1 font-black">{nextAppointment.date || "Today"}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white/10 p-3">
+                      <p className="text-cyan-50/60">Time</p>
+                      <p className="mt-1 font-black">{nextAppointment.time || "Not set"}</p>
+                    </div>
+                  </div>
+                  <Link
+                    to={`${careBasePath}/appointments`}
+                    className="mt-5 inline-flex min-h-11 items-center rounded-full bg-[#F59E0B] px-5 text-sm font-black text-[#134E4A]"
+                  >
+                    Open appointments
+                  </Link>
+                </div>
+              ) : (
+                <div className="mt-6 rounded-2xl border border-white/10 bg-white/10 p-5">
+                  <p className="text-xl font-black">
+                    {isVendor ? "No clinic bookings waiting" : "No patient waiting"}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-cyan-50/70">
+                    {isVendor
+                      ? "New clinic appointments will appear here as soon as booking data arrives."
+                      : "New appointments will appear here as soon as the queue receives data."}
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {careStats.map(({ label, value, icon: Icon, href }) => (
+              <Link
+                key={label}
+                to={href}
+                className="group min-h-[170px] rounded-[1.5rem] border border-[#67E8F9]/45 bg-white p-4 shadow-lg shadow-teal-900/8 transition hover:-translate-y-1 hover:border-[#0D9488]"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ECFEFF] text-xl text-[#0D9488]">
+                    <Icon />
+                  </span>
+                  <FaArrowTrendUp className="text-[#F59E0B] opacity-80" />
+                </div>
+                <p className="mt-4 text-3xl font-black">{value}</p>
+                <p className="mt-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#134E4A]/55">
+                  {label}
+                </p>
+              </Link>
+            ))}
+          </section>
+
+          <section className="mt-5 grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+            <div className="rounded-[1.75rem] border border-[#67E8F9]/45 bg-white p-5 shadow-xl shadow-teal-900/8">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                    Schedule
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black">Today's appointment queue</h2>
+                </div>
+                <Link
+                  to={`${careBasePath}/appointments`}
+                  className="rounded-full bg-[#ECFEFF] px-4 py-2 text-xs font-black text-[#0D9488]"
+                >
+                  View all
+                </Link>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {rows.length ? (
+                  rows.slice(0, 6).map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between gap-4 rounded-2xl border border-[#67E8F9]/40 bg-[#ECFEFF]/60 p-4"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black">
+                          {item.name || item.patient || "Guest patient"}
+                        </p>
+                        <p className="mt-1 text-xs font-semibold text-[#134E4A]/60">
+                          {item.date || "Today"} - {item.time || "Slot not set"}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#0D9488]">
+                        Ready
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-[#67E8F9] bg-[#ECFEFF] p-7 text-center">
+                    <p className="text-base font-black">No appointments today</p>
+                    <p className="mt-2 text-sm leading-6 text-[#134E4A]/60">
+                      {isVendor
+                        ? "Your clinic appointment queue will show here."
+                        : "Your booked patient queue will show here."}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-[#67E8F9]/45 bg-white p-5 shadow-xl shadow-teal-900/8">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                    Weekly rhythm
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black">Bookings by day</h2>
+                </div>
+                <span className="rounded-full bg-[#ECFEFF] px-4 py-2 text-xs font-black text-[#134E4A]/65">
+                  Empty-data safe
                 </span>
               </div>
-            )}
-
-            {/* <div className="absolute top-[145px] lg:top-[185px] ml-8 font-bold text-white text-4xl lg:text-6xl">
-              {count}
-            </div> */}
-
-            <div className="absolute top-[90px] lg:top-[120px] ml-8 font-semibold text-white text-xl lg:text-3xl">
-            <span className="text-4xl lg:text-6xl font-bold">{count}{" "}</span>
-               Visits for{" "}
-              <span className="text-3xl lg:text-5xl font-bold">Today</span>
+              <div className="relative">
+                <BarChart
+                  xAxis={[
+                    {
+                      scaleType: "band",
+                      data: weeklyLabels,
+                      tickLabelStyle: { fill: "#134E4A", fontWeight: 700 },
+                    },
+                  ]}
+                  yAxis={[
+                    {
+                      tickLabelStyle: { fill: "#134E4A", fontWeight: 700 },
+                    },
+                  ]}
+                  series={[
+                    { data: bookedSeries, label: "Booked", color: "#0D9488" },
+                    { data: availableSeries, label: "Available", color: "#67E8F9" },
+                    { data: cancelledSeries, label: "Cancelled", color: "#F59E0B" },
+                  ]}
+                  height={320}
+                  margin={{ top: 35, right: 20, bottom: 60, left: 45 }}
+                  slotProps={{
+                    legend: {
+                      labelStyle: { fill: "#134E4A", fontWeight: 800 },
+                    },
+                  }}
+                />
+                {!hasWeeklyData && (
+                  <div className="absolute inset-x-4 top-24 rounded-[1.5rem] border border-dashed border-[#67E8F9]/70 bg-white/92 p-5 text-center shadow-xl shadow-teal-900/8">
+                    <p className="text-lg font-black text-[#134E4A]">No weekly data yet</p>
+                    <p className="mt-1 text-sm font-semibold text-[#134E4A]/60">
+                      Bookings, cancellations, and open slots will draw this chart once live activity starts.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-            {/* <div className="absolute top-[145px] lg:top-[185px] ml-8 font-bold text-white text-4xl lg:text-6xl">
-              {count}
-            </div> */}
-            {/* <div className="hidden sm:block  absolute w-[170px] md:w-[150px] lg:w-[170px] h-[90px] md:h-auto lg:h-[100px] bg-[white] opacity-45  top-[140px] ml-32 md:top-[140px] md:ml-24 lg:top-[195px] lg:ml-40 rounded-xl ">
-              <div className="!opacity-100 p-2">
-                <text className="font-bold text-white-900 !opacity-100 text-lg ">
-                  New Patients
-                </text>
-              </div>
-              <div className="text-white-900 font-bold text-2xl pl-2 opacity-100">
-                40
-              </div>
-              <div className="flex px-1.5 items-center font-bold absolute left-[100px] md:left-[55px] lg:left-[100px] top-[45px] md:top-[35px] lg:top-[45px] text-[20px] pl-2 opacity-100 bg-[#DFFDDD] text-green-800 rounded-lg">
-                51%
-                <HiArrowTrendingUp className="font-bold text-[30px] pl-2 opacity-100" />
+          </section>
+
+          <section className="mt-5 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="rounded-[1.75rem] border border-[#67E8F9]/45 bg-white p-5 shadow-xl shadow-teal-900/8">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                Patients
+              </p>
+              <h2 className="mt-2 text-2xl font-black">Appointment records</h2>
+              <div className="mt-4">
+                <div className="w-full">
+                  <ModernDataGrid
+                    rows={rows}
+                    columns={columns}
+                    disableRowSelectionOnClick
+                    localeText={{ noRowsLabel: "No record is available." }}
+                    initialState={{
+                      pagination: { paginationModel: { pageSize: 5 } },
+                    }}
+                    pageSizeOptions={[5, 10]}
+                    sx={{
+                      minHeight: 360,
+                      border: "1px solid rgba(103, 232, 249, 0.45)",
+                      borderRadius: "22px",
+                      overflow: "hidden",
+                      color: "#134E4A",
+                      "& .MuiDataGrid-columnHeaders": {
+                        backgroundColor: "#ECFEFF",
+                        color: "#134E4A",
+                        fontSize: "14px",
+                        fontWeight: 900,
+                      },
+                      "& .MuiDataGrid-cell": {
+                        borderColor: "rgba(103, 232, 249, 0.35)",
+                      },
+                      "& .MuiDataGrid-footerContainer": {
+                        borderColor: "rgba(103, 232, 249, 0.35)",
+                      },
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="hidden sm:block  absolute w-[170px] md:w-[150px] lg:w-[170px] h-[90px] md:h-auto lg:h-[100px] bg-[white] opacity-45  top-[140px] ml-[320px] md:top-[140px] md:ml-[260px] lg:top-[195px] lg:ml-[360px] rounded-xl ">
-              <div className="!opacity-100 p-2">
-                <text className="font-bold text-white-900 !opacity-100 text-lg ">
-                  Old Patients
-                </text>
-              </div>
-              <div className="text-white-900 font-bold text-2xl pl-2 opacity-100">
-                64
-              </div>
-              <div className="flex px-1.5 items-center font-bold absolute left-[100px] md:left-[55px] lg:left-[80px] top-[45px] md:top-[35px] lg:top-[45px] text-[16px] pl-2 opacity-100 bg-[#FBC3C3] text-red-800 rounded-lg">
-                20%
-                <HiArrowTrendingDown className="font-bold text-[30px] pl-2 opacity-100" />
-              </div>
-            </div> */}
-
-            {/* <div className="hidden sm:block  absolute w-[170px] md:w-[150px] lg:w-[140px] h-[90px] md:h-auto lg:h-[90px] bg-[white] opacity-45 top-[130px] ml-[320px]  sm:top-[135px] sm:ml-[320px] md:top-[130px] md:ml-[260px] lg:top-[205px] lg:ml-[355px] rounded-xl">
-              <div className=" !opacity-100 p-2">
-                <text className="font-bold text-white-900 !opacity-100 text-md ">
-                  Old Patients
-                </text>
-              </div>
-              <div className="text-white-900 font-bold text-2xl pl-2 opacity-100">
-                64
-              </div>
-              <div className="flex px-1.5 items-center font-bold absolute left-[70px] md:left-[55px] lg:left-[65px] top-[40px] pl-2 opacity-100 bg-[#FBC3C3] text-red-800 text-[15px] rounded-lg">
-                20%
-                <HiArrowTrendingDown className="font-bold text-[25px] pl-2 opacity-100" />
-              </div>
-            </div> */}
-
-            {issuperuser || isVendor || isstaff ? (
-              <div className=" hidden xl:flex absolute md:top-[20px] md:right-[30px]">
-                {/* <CalendarSelect /> */}
+            <div className="rounded-[1.75rem] border border-[#67E8F9]/45 bg-white p-5 shadow-xl shadow-teal-900/8">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                Slot health
+              </p>
+              <h2 className="mt-2 text-2xl font-black">Availability mix</h2>
+              <div className="relative mt-3 flex justify-center">
                 <PieChart
                   series={[
                     {
-                      innerRadius: 40,
-                      outerRadius: 120,
-                      paddingAngle: 4,
-                      cornerRadius: 5,
-                      startAngle: -45,
-                      endAngle: 225,
-
-                      data: [
-                        {
-                          id: 0,
-                          value: piebooked,
-                          color: "#b5afae",
-                          label: "Booked",
-                        },
-                        {
-                          id: 1,
-                          value: pieavailable,
-                          color: "#2756f2",
-                          label: "Available",
-                        },
-                        {
-                          id: 2,
-                          value: piecancelled,
-                          color: "#e82b0e",
-                          label: "Cancelled",
-                        },
-                      ],
+                      data: pieData,
+                      innerRadius: 50,
+                      outerRadius: 105,
+                      paddingAngle: 3,
+                      cornerRadius: 6,
                     },
                   ]}
-                  width={430}
-                  height={350}
+                  width={320}
+                  height={250}
                   slotProps={{
-                    legend: { labelStyle: { fontWeight: 500, fill: "white" } },
+                    legend: {
+                      labelStyle: { fill: "#134E4A", fontWeight: 800 },
+                    },
                   }}
                 />
+                {!hasPieData && (
+                  <div className="absolute inset-x-4 top-28 rounded-[1.5rem] border border-dashed border-[#67E8F9]/70 bg-white/92 p-4 text-center shadow-lg shadow-teal-900/8">
+                    <p className="text-sm font-black">No availability data yet</p>
+                    <p className="mt-1 text-xs font-semibold text-[#134E4A]/60">
+                      Slot mix appears after bookings sync.
+                    </p>
+                  </div>
+                )}
               </div>
-            ) : null}
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                {rawPieData.map((item) => (
+                  <div key={item.label} className="rounded-2xl bg-[#ECFEFF] p-3">
+                    <p className="text-2xl font-black">{item.value}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.1em] text-[#134E4A]/55">
+                      {item.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen w-full overflow-hidden bg-[#ECFEFF] px-4 py-6 text-[#134E4A] sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden rounded-[2rem] border border-[#67E8F9]/50 bg-[#134E4A] p-6 text-white shadow-2xl shadow-teal-950/15 lg:p-8">
+        <div className="absolute inset-0 care-scan-grid opacity-20" aria-hidden="true" />
+        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#67E8F9]">
+              <FaRegCircleCheck />
+              {panelName}
+            </p>
+            <h1 className="mt-5 max-w-4xl text-4xl font-black leading-tight sm:text-5xl">
+              {greeting}, {personName}
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-cyan-50/75">
+              Monitor live appointments, clinic capacity, and patient movement from a
+              Firebase-ready operations dashboard.
+            </p>
           </div>
-          {issuperuser || isVendor ? (
-            <div className="grid grid-cols-3 gap-4 my-4">
-              <div className="col-span-full lg:col-span-2 xl:col-span-1 flex flex-col gap-3 max-h-[480px] ">
-                <div className="w-full flex items-center justify-start">
-                  <p className="text-3xl font-bold">Staff Members</p>
-                </div>
-                <div className="flex flex-col gap-4 max-h-[480px] overflow-y-auto scrollable">
-                  {staff.length > 0
-                    ? staff.map((item, intex) => {
-                        return (
-                          <div
-                            key={item.id}
-                            className="w-full flex items-center justify-around gap-3 px-3 py-4 bg-gray-400 rounded-xl"
-                          >
-                            <img
-                              className="h-[100px] w-[100px] rounded-full"
-                              src={
-                                "http://doctor-appointment-software.logicspice.com/Backend/media/"+
-                                item.image
-                              }
-                              alt={`${item.fname} ${item.lname}`}
-                            />
-                            <div className="flex flex-col items-start justify-start bg-gray-200 p-3 rounded-xl">
-                              <p className="text-xl font-bold">
-                                {item.fname} {item.lname}
-                              </p>
-                              <p className="text-md font-medium">{item.role}</p>
-                              <p className="text-sm font-bold">
-                                {item.location}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    : null}
 
-                  {/* <div className="w-full flex items-center justify-around gap-3 px-3 py-4 bg-gray-400 rounded-xl">
-                    <img
-                      className="h-[100px] w-[100px] rounded-full"
-                      src="/assets/Admin/Staff/staff2.png"
-                      alt=""
-                    />
-                    <div className="flex flex-col items-start justify-start bg-gray-200 p-3 rounded-xl">
-                      <p className="text-xl font-bold">Ryan Gouse</p>
-                      <p className="text-md font-medium">Heart Specialist</p>
-                      <p className="text-sm font-bold">Pratap Nagar</p>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              to={`${basePath}/appointments`}
+              className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#F59E0B] px-6 text-sm font-black text-[#134E4A] shadow-xl shadow-amber-950/10 transition hover:bg-[#67E8F9]"
+            >
+              <FaCalendarCheck />
+              Appointments
+            </Link>
+            <Link
+              to="/"
+              className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-6 text-sm font-black text-white transition hover:bg-white/20"
+            >
+              View site
+            </Link>
+          </div>
+        </div>
+
+        <div className="relative mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {statCards.map(({ label, value, icon: Icon, tone, href }) => (
+            <Link
+              key={label}
+              to={href}
+              className={`rounded-[1.5rem] border border-white/15 p-5 shadow-xl shadow-teal-950/10 transition hover:-translate-y-1 ${tone}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#ECFEFF] text-xl text-[#0D9488]">
+                  <Icon />
+                </span>
+                <FaArrowTrendUp className="text-[#F59E0B]" />
+              </div>
+              <p className="mt-5 text-4xl font-black">{value}</p>
+              <p className="mt-2 text-xs font-black uppercase tracking-[0.16em] opacity-70">
+                {label}
+              </p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-6 grid gap-6 xl:grid-cols-[1.45fr_0.85fr]">
+        <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-5 shadow-2xl shadow-teal-900/10 lg:p-6">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                Appointment chart
+              </p>
+              <h2 className="mt-2 text-2xl font-black">Weekly capacity movement</h2>
+            </div>
+            <p className="inline-flex items-center gap-2 rounded-full bg-[#ECFEFF] px-4 py-2 text-xs font-black text-[#134E4A]/70">
+              <FaClock className="text-[#0D9488]" />
+              Live fallback safe
+            </p>
+          </div>
+          <div className="relative">
+            <BarChart
+              xAxis={[
+                {
+                  scaleType: "band",
+                  data: weeklyLabels,
+                  label: "Date",
+                  tickLabelStyle: { fill: "#134E4A", fontWeight: 700 },
+                },
+              ]}
+              yAxis={[
+                {
+                  label: "Appointments",
+                  tickLabelStyle: { fill: "#134E4A", fontWeight: 700 },
+                },
+              ]}
+              series={[
+                { data: bookedSeries, label: "Booked", color: "#0D9488" },
+                { data: availableSeries, label: "Available", color: "#67E8F9" },
+                { data: cancelledSeries, label: "Cancelled", color: "#F59E0B" },
+              ]}
+              height={360}
+              margin={{ top: 35, right: 20, bottom: 70, left: 60 }}
+              slotProps={{
+                legend: {
+                  labelStyle: { fill: "#134E4A", fontWeight: 800 },
+                },
+              }}
+            />
+            {!hasWeeklyData && (
+              <div className="absolute inset-x-4 top-28 rounded-[1.5rem] border border-dashed border-[#67E8F9]/70 bg-white/92 p-6 text-center shadow-xl shadow-teal-900/8">
+                <p className="text-xl font-black text-[#134E4A]">No weekly movement yet</p>
+                <p className="mt-1 text-sm font-semibold text-[#134E4A]/60">
+                  The chart will populate as Firebase receives appointments, test bookings, and cancellations.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-5 shadow-2xl shadow-teal-900/10 lg:p-6">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+            Slot health
+          </p>
+          <h2 className="mt-2 text-2xl font-black">Availability mix</h2>
+          <div className="relative mt-4 flex justify-center">
+            <PieChart
+              series={[
+                {
+                  data: pieData,
+                  innerRadius: 52,
+                  outerRadius: 112,
+                  paddingAngle: 3,
+                  cornerRadius: 6,
+                },
+              ]}
+              width={330}
+              height={260}
+              slotProps={{
+                legend: {
+                  labelStyle: { fill: "#134E4A", fontWeight: 800 },
+                },
+              }}
+            />
+            {!hasPieData && (
+              <div className="absolute inset-x-4 top-28 rounded-[1.5rem] border border-dashed border-[#67E8F9]/70 bg-white/92 p-4 text-center shadow-lg shadow-teal-900/8">
+                <p className="text-sm font-black">No live slot mix yet</p>
+                <p className="mt-1 text-xs font-semibold text-[#134E4A]/60">
+                  Booked, available, and cancelled counts will appear here automatically.
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+            {rawPieData.map((item) => (
+              <div key={item.label} className="rounded-2xl bg-[#ECFEFF] p-3">
+                <p className="text-2xl font-black">{item.value}</p>
+                <p className="mt-1 text-[11px] font-black uppercase tracking-[0.12em] text-[#134E4A]/60">
+                  {item.label}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-5 shadow-2xl shadow-teal-900/10 lg:p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                Care team
+              </p>
+              <h2 className="mt-2 text-2xl font-black">Staff on the system</h2>
+            </div>
+            <Link
+              to={`${basePath}/staff`}
+              className="rounded-full bg-[#ECFEFF] px-4 py-2 text-xs font-black text-[#0D9488]"
+            >
+              Manage
+            </Link>
+          </div>
+
+          <div className="mt-5 max-h-[360px] space-y-3 overflow-y-auto pr-1">
+            {clinicLists.staff.length ? (
+              clinicLists.staff.slice(0, 8).map((item, index) => (
+                <div
+                  key={item.id || item.username || index}
+                  className="flex items-center gap-4 rounded-2xl border border-[#67E8F9]/40 bg-[#ECFEFF]/70 p-3"
+                >
+                  <img
+                    src={normalizeImage(item.image)}
+                    alt={`${item.fname || "Care"} ${item.lname || "staff"}`}
+                    className="h-14 w-14 rounded-2xl object-cover"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black">
+                      {item.fname || "Care"} {item.lname || "specialist"}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-[#134E4A]/60">
+                      <FaLocationDot className="text-[#0D9488]" />
+                      {item.role || item.department || item.location || "Clinic team"}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[#67E8F9] bg-[#ECFEFF] p-6 text-center">
+                <p className="text-sm font-black">No staff data yet</p>
+                <p className="mt-2 text-xs leading-6 text-[#134E4A]/60">
+                  Staff members will appear here after Firebase/backend data is available.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          {listCards.map((card) => (
+            <div
+              key={card.title}
+              className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-5 shadow-2xl shadow-teal-900/10"
+            >
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                {card.title}
+              </p>
+              <div className="mt-4 max-h-[300px] space-y-2 overflow-y-auto">
+                {card.items.length ? (
+                  card.items.slice(0, 12).map((item, index) => (
+                    <div
+                      key={`${card.title}-${item}-${index}`}
+                      className="rounded-2xl bg-[#ECFEFF] px-4 py-3 text-sm font-black"
+                    >
+                      {item || "Untitled"}
                     </div>
-                  </div>
-
-                  <div className="w-full flex items-center justify-around gap-3 px-3 py-4 bg-gray-400 rounded-xl">
-                    <img
-                      className="h-[100px] w-[100px] rounded-full"
-                      src="/assets/Admin/Staff/staff4.png"
-                      alt=""
-                    />
-                    <div className="flex flex-col items-start justify-start bg-gray-200 p-3 rounded-xl">
-                      <p className="text-xl font-bold">Leo Arcand</p>
-                      <p className="text-base font-medium">Eye Specialist</p>
-                      <p className="text-sm font-bold">Mansarovar</p>
-                    </div>
-                  </div> */}
-                </div>
-              </div>
-              <div className="col-span-full lg:col-span-1 flex flex-col gap-3 items-center justify-center">
-                <div className="bg-[#1476f7] w-full h-2/5 flex flex-col gap-3 items-center justify-center rounded-lg p-3">
-                  <p className="text-3xl font-extrabold text-white">
-                    Departments
+                  ))
+                ) : (
+                  <p className="rounded-2xl border border-dashed border-[#67E8F9] bg-[#ECFEFF] px-4 py-5 text-center text-xs font-bold text-[#134E4A]/60">
+                    No data yet
                   </p>
-                  <div className="flex flex-col bg-[#6babff] py-2.5 px-4 xl:px-12 rounded-xl justify-start items-center gap-2 overflow-y-auto min-w-4/5 scrollable">
-                    {departments.length > 0
-                      ? departments.map((item, index) => {
-                          return (
-                            <p className="text-base font-bold text-center">
-                              {item.name}
-                            </p>
-                          );
-                        })
-                      : null}
-                  </div>
-                </div>
-                <div className="bg-[#0ddb3a] w-full h-3/5 flex flex-col gap-3 items-center justify-center rounded-lg p-3">
-                  <p className="text-4xl font-extrabold text-white">
-                    Locations
-                  </p>
-                  <div className="flex flex-col bg-[#74fc92] py-4 px-4 xl:px-12  rounded-xl justify-start items-center gap-2 !max-h-[180px] overflow-y-auto min-w-4/5 scrollable">
-                    {locations.length > 0
-                      ? locations.map((item, index) => {
-                          return (
-                            <p className="text-base font-bold text-center">
-                              {item.name}
-                            </p>
-                          );
-                        })
-                      : null}
-                  </div>
-                </div>
-              </div>
-              <div className="px-4 col-span-full lg:col-span-2 xl:col-span-1 flex flex-col gap-4 justify-center items-center bg-[#fcc479] py-5 lg:py-0 rounded-xl">
-                <p className="text-5xl font-extrabold text-white">Services</p>
-                <div className="flex flex-col bg-[#ffead6] justify-start items-start py-4 px-2 xl:px-12 rounded-xl gap-2 !max-h-[340px] overflow-y-auto min-w-4/5 scrollable">
-                  {services.length > 0
-                    ? services.map((item, index) => {
-                        return (
-                          <li className="text-base font-bold p-1 !text-start">
-                            {item.name}
-                          </li>
-                        );
-                      })
-                    : null}
-                </div>
+                )}
               </div>
             </div>
-          ) : null}
+          ))}
+        </div>
+      </section>
 
-          <div className=" pt-4 font-semibold text-xl">Appointment Chart</div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {/* <div className="bg-[#0E3A53] h-[162px] rounded-[15px] ">
-              <div className="flex flex-row p-3  space-x-2 text-white ">
-                <div>
-                  <img
-                    src="/assets/Admin/Dashboard/ac1.png"
-                    alt=""
-                    className="bg-[#ffffff] p-1 rounded-[8px] animate-move-up-down"
-                  />
-                </div>
-                <div>
-                  Attended
-                  <br />
-                  <span>45</span>
-                </div>
-                <div>
-                  Remaining
-                  <br />
-                  <span>05</span>
-                </div>
-              </div>
-              <div className="text-white pl-3 text-lg font-semibold">
-                <div>Video Consultation</div>
-                <div>Appointment</div>
+      <section className="mt-6 grid gap-6 xl:grid-cols-2">
+        {[
+          ["Today's Appointments", rows],
+          ["Cancelled Appointments", cancelledRows],
+        ].map(([title, gridRows]) => (
+          <div
+            key={title}
+            className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-5 shadow-2xl shadow-teal-900/10 lg:p-6"
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                  Appointments
+                </p>
+                <h2 className="mt-2 text-2xl font-black">{title}</h2>
               </div>
             </div>
-            <div className="bg-[#F16163] h-[162px] rounded-[15px]">
-              <div className="flex flex-row p-3  space-x-2 text-white">
-                <div>
-                  <img
-                    src="/assets/Admin/Dashboard/ac2.png"
-                    alt=""
-                    className="bg-[#ffffff] p-1 rounded-[8px] animate-move-up-down"
-                  />
-                </div>
-                <div>
-                  Attended
-                  <br />
-                  <span>49</span>
-                </div>
-                <div>
-                  Remaining
-                  <br />
-                  <span>01</span>
-                </div>
-              </div>
-              <div className="text-white pl-3 text-lg font-semibold">
-                <div>Chat Consultation</div>
-                <div>Appointment</div>
-              </div>
-            </div>
-            <div className="bg-[#1030A4] h-[162px] rounded-[15px]">
-              <div className="flex flex-row p-3  space-x-2 text-white">
-                <div>
-                  <img
-                    src="/assets/Admin/Dashboard/ac3.png"
-                    alt=""
-                    className="bg-[#ffffff] p-1 rounded-[8px] animate-move-up-down"
-                  />
-                </div>
-                <div>
-                  Attended
-                  <br />
-                  <span>123</span>
-                </div>
-                <div>
-                  Remaining
-                  <br />
-                  <span>09</span>
-                </div>
-              </div>
-              <div className="text-white pl-3 text-lg font-semibold">
-                <div>Clinic Consultation</div>
-                <div>Appointment</div>
-              </div>
-            </div> */}
-            <div className="col-span-full w-[100%]">
-              <BarChart
-                xAxis={[
-                  {
-                    barGapRatio: 0.3,
-                    scaleType: "band",
-                    data: weeklydata.dates,
-                    label: "Date",
-                    labelStyle: { fontWeight: 600 },
+            <div className="w-full">
+              <ModernDataGrid
+                rows={gridRows}
+                columns={columns}
+                disableRowSelectionOnClick
+                localeText={{ noRowsLabel: "No record is available." }}
+                initialState={{
+                  pagination: { paginationModel: { pageSize: 5 } },
+                }}
+                pageSizeOptions={[5, 10]}
+                sx={{
+                  minHeight: 380,
+                  border: "1px solid rgba(103, 232, 249, 0.45)",
+                  borderRadius: "24px",
+                  overflow: "hidden",
+                  color: "#134E4A",
+                  "& .MuiDataGrid-columnHeaders": {
+                    backgroundColor: "#ECFEFF",
+                    color: "#134E4A",
+                    fontSize: "14px",
+                    fontWeight: 900,
                   },
-                ]}
-                yAxis={[
-                  {
-                    label: "No. of appointments",
-                    labelStyle: { fontWeight: 600 },
+                  "& .MuiDataGrid-cell": {
+                    borderColor: "rgba(103, 232, 249, 0.35)",
                   },
-                ]}
-                series={[
-                  { data: weeklydata.booked, label: "Booked" },
-                  { data: weeklydata.available, label: "Available" },
-                  { data: weeklydata.cancelled, label: "Cancelled" },
-                ]}
-                // slotProps={{
-                //   legend: {
-                //   },
-                // }}
-                height={400}
+                  "& .MuiDataGrid-footerContainer": {
+                    borderColor: "rgba(103, 232, 249, 0.35)",
+                  },
+                }}
               />
             </div>
           </div>
-          <div className="grid grid-rows-2 lg:grid-cols-2 gap-4">
-            <div className=" grid grid-cols-1">
-              <div className="flex  py-4 font-semibold text-xl place-content-between">
-                <div> Today's Appointments </div>
-                {/* <div><IoIosMore className="text-3xl text-[#1030A4]" /></div> */}
-              </div>
-
-              <div className="bg-white ">
-                <Box sx={{ width: 1 }}>
-                  <DataGrid
-                    rows={rows}
-                    columns={columns}
-                    localeText={{
-                      noRowsLabel: "No record is available.",
-                    }}
-                    initialState={{
-                      // ...data.initialState,
-                      pagination: { paginationModel: { pageSize: 5 } },
-                    }}
-                    sx={{
-                      minHeight: 370,
-                      "& .MuiDataGrid-columnHeaders": {
-                        color: "black",
-                        fontSize: "16px",
-                        fontWeight: "800",
-                      },
-                    }}
-                    //  pageSizeOptions={[5, 10, 25]}
-                    // slotProps={{
-                    //     toolbar: {
-                    //         showQuickFilter: true,
-                    //     },
-                    // }}
-                  />
-                </Box>
-              </div>
-            </div>
-            <div className=" grid grid-cols-1">
-              <div className="flex  py-4 font-semibold text-xl place-content-between">
-                <div> Cancelled Appointments </div>
-                {/* <div><IoIosMore className="text-3xl text-[#1030A4]" /></div> */}
-              </div>
-
-              <div className="bg-white ">
-                <Box sx={{ width: 1 }}>
-                  <DataGrid
-                    rows={rowss}
-                    columns={columns}
-                    localeText={{
-                      noRowsLabel: "No record is available.",
-                    }}
-                    initialState={{
-                      // ...data.initialState,
-                      pagination: { paginationModel: { pageSize: 5 } },
-                    }}
-                    sx={{
-                      minHeight: 370,
-                      "& .MuiDataGrid-columnHeaders": {
-                        color: "black",
-                        fontSize: "16px",
-                        fontWeight: "800",
-                      },
-                    }}
-                    //  pageSizeOptions={[5, 10, 25]}
-                    // slotProps={{
-                    //     toolbar: {
-                    //         showQuickFilter: true,
-                    //     },
-                    // }}
-                  />
-                </Box>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+        ))}
+      </section>
+    </main>
   );
 };
 

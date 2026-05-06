@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { PhotoIcon } from "@heroicons/react/24/solid";
 import AdminSearch from "../../../Component/Admin/adminsearch";
 import DoctorSearch from "../../../Component/Doctor/doctorsearch";
 import VendorSearch from "../../../Component/Vendor/vendorsearch";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import axios from "axios";
-import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import "react-quill/dist/quill.bubble.css";
 import Cookies from "js-cookie";
@@ -75,6 +73,7 @@ const EditLocation = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     setIsStaff(Cookies.get("is_staff") === "true");
     getData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e) => {
@@ -128,7 +127,7 @@ const EditLocation = () => {
       });
       if (result?.isConfirmed) {
         try {
-          const response = await axios.put(
+          await axios.put(
             `${BaseUrl}clinic/managelocation/${id}/`,
             formDataToSend,
             {
@@ -173,7 +172,7 @@ const EditLocation = () => {
     <>
       {/* {formData.name && ( */}
         <>
-          <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+          <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
             {isSuperuser ? (
               <AdminSearch />
             ) : isVendor && !isStaff ? (
@@ -214,11 +213,11 @@ const EditLocation = () => {
                 </Link>
               </Breadcrumbs>
             </div>
-            <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+            <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
               <div className="flex items-center justify-between">
-                <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+                <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
                   Edit Location
-                </text>
+                </span>
               </div>
               <div>
                 <form id="AddBlog" onSubmit={handleSubmit}>

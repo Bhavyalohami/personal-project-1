@@ -4,7 +4,6 @@ import { TimePicker } from "@mui/x-date-pickers";
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import {
-  Button,
   FormControl,
   InputLabel,
   MenuItem,
@@ -14,7 +13,6 @@ import {
 } from "@mui/material";
 import { Link, useNavigate } from "react-router-dom";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { DemoContainer } from "@mui/x-date-pickers/internals/demo";
 import FormDialog from "../../../Component/Admin/addmodal";
 import axios from "axios";
 import { MdDelete } from "react-icons/md";
@@ -36,11 +34,11 @@ const SlotSettings = () => {
   // const [open, setOpen] = useState(false);
   const [durations, setDurations] = useState({});
   // const [selectedDate, setSelectedDate] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [isVendor, setIsVendor] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
-  const [data, setData] = useState({
+  const [, setData] = useState({
     number_of_days: null,
     check_days: false,
     until_date: null,
@@ -70,6 +68,7 @@ const SlotSettings = () => {
 
       setSelectedDoctor(name.current);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [Doctorlist, username]);
 
   const handledoctorchange = (e) => {
@@ -425,7 +424,7 @@ const SlotSettings = () => {
     event.preventDefault();
   }
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+    <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
       {isSuperuser ? (
         <AdminSearch />
       ) : isVendor && !isStaff ? (
@@ -463,11 +462,11 @@ const SlotSettings = () => {
             </Breadcrumbs>
           </div>
 
-      <div className="w-full min-h-screen bg-[#F2F2F2]  py-4 mt-3  ">
+      <div className="legacy-panel-surface w-full min-h-screen  py-4 mt-3  ">
         <div className="flex items-center justify-between pb-4 px-2 sm:!px-4">
-          <text className="font-nunito-sans text-[22px] sm:text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[22px] sm:text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Slot-Settings
-          </text>
+          </span>
         </div>
 
         <main className="flex flex-col p-4 sm:p-6 md:p-8 lg:p-12 space-y-6 sm:space-y-8 md:space-y-10 lg:space-y-12">

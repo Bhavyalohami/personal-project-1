@@ -62,6 +62,7 @@ const SetupNotification = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     setIsStaff(Cookies.get("is_staff") === "true");
     getData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleChange = (e) => {
@@ -162,7 +163,7 @@ const SetupNotification = () => {
           cancelButtonText: "No",
         });
         if (confirmationResult.isConfirmed) {
-          const response = await axios.put(
+          await axios.put(
             `${BaseUrl}clinic/setupnotifications/`,
             formData,
             {
@@ -216,9 +217,9 @@ const SetupNotification = () => {
 
       <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
           Notification Settings
-          </text>
+          </span>
         </div>
         <div>
           <form id="Update Links" onSubmit={handleSubmit}>

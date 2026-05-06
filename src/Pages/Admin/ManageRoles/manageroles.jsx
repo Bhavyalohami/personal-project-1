@@ -63,6 +63,7 @@ const ManageRoles = () => {
     setIsStaff(Cookies.get("is_staff") === "true");
     setIsVendor(Cookies.get("is_vendor") === "true");
     fetchRoles(username);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username]);
 
   useEffect(() => {
@@ -175,7 +176,7 @@ const ManageRoles = () => {
     if (result.isConfirmed) {
       try {
         const token = Cookies.get("token");
-        const response = await axios.patch(
+        await axios.patch(
           `${BaseUrl}clinic/update-roles/`,
           payload,
           {

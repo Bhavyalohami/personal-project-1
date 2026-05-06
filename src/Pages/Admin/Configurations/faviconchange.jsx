@@ -21,24 +21,12 @@ const FaviconChange = () => {
   const [file, setFile] = useState(null);
   const [imageSrc, setImageSrc] = useState("");
   const [logo, setLogo] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error1, setError1] = useState(null);
+  const [, setLoading] = useState(true);
+  const [, setError1] = useState(null);
   const navigate = useNavigate();
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-    setFormErrors({
-      ...formErrors,
-      [name]: "",
-    });
-  };
-
   const validateForm = () => {
     let isValid = true;
     const errors = { ...formErrors };
@@ -71,7 +59,7 @@ const FaviconChange = () => {
           const formData = new FormData();
           formData.append("new_favicon", file); // Append the file to FormData
 
-          const response = await axios.put(
+          await axios.put(
             `${BaseUrl}clinic/faviconchange/`,
             formData,
             {
@@ -173,12 +161,13 @@ const FaviconChange = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     setIsStaff(Cookies.get("is_staff") === "true");
     getData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   function handleBreadClick(event) {
     event.preventDefault();
   }
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+    <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
       {isSuperuser ? (
         <AdminSearch />
       ) : isVendor && !isStaff ? (
@@ -204,12 +193,12 @@ const FaviconChange = () => {
         </Breadcrumbs>
       </div>
 
-      <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+      <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             {" "}
             Change Favicon{" "}
-          </text>
+          </span>
         </div>
         {logo && (
           <div className="mt-10 rounded">
@@ -237,7 +226,7 @@ const FaviconChange = () => {
                           {imageSrc ? (
                             <img
                               src={imageSrc}
-                              alt="Image preview"
+                              alt="Preview"
                               style={{ maxWidth: "200px", maxHeight: "200px" }}
                             />
                           ) : (

@@ -54,7 +54,7 @@ const AddStaff = () => {
   const [formData, setFormData] = useState(initialFormData);
   const [formErrors, setFormErrors] = useState(initialFormErrors);
   const [error, setError] = useState("");
-  const [file, setFile] = useState(null);
+  const [, setFile] = useState(null);
   const [imageSrc, setImageSrc] = useState("");
   const [locationData, setLocationData] = useState([]);
   const [departmentData, setDepartmentData] = useState([]);
@@ -62,15 +62,6 @@ const AddStaff = () => {
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
-  const [selectedDays, setSelectedDays] = useState([
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-    "Sunday",
-  ]);
   const [loading, setLoading] = useState(false);
 
   const getLocationData = async () => {
@@ -130,9 +121,10 @@ const AddStaff = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     getLocationData();
     getDepartmentData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [staff, setStaff] = useState();
+  const [, setStaff] = useState();
 
   let staffAvl = useRef();
 
@@ -272,7 +264,7 @@ const AddStaff = () => {
     try {
       setLoading(true);
       window.scrollTo(0, 0);
-      const response = await axios.post(apiUrl, staffData, {
+      await axios.post(apiUrl, staffData, {
         headers: {
           Authorization: `Token ${token}`,
           "Content-Type": "multipart/form-data",
@@ -318,7 +310,7 @@ const AddStaff = () => {
 
     try {
       setLoading(true);
-      const response = await axios.post(apiUrl, registrationData, {
+      await axios.post(apiUrl, registrationData, {
         headers: {
           Authorization: `Token ${token}`,
           "Content-Type": "application/json",
@@ -428,7 +420,7 @@ const AddStaff = () => {
   return (
     <>
       {!loading ? (
-        <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+        <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
           {isSuperuser ? (
             <AdminSearch />
           ) : isVendor && !isStaff ? (
@@ -467,11 +459,11 @@ const AddStaff = () => {
             </Breadcrumbs>
           </div>
 
-          <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+          <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
             <div className="flex items-center justify-between">
-              <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+              <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
                 Add Staff
-              </text>
+              </span>
             </div>
             <div>
               <form id="AddBlog" onSubmit={handleSubmit}>

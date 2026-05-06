@@ -28,7 +28,6 @@ export default function FormAddDialog({ dateName,username }) {
     endTime: "",
     duration: "",
   });
-  const [data, setData] = React.useState();
   const [existingSlots, setExistingSlots] = React.useState([]);
 
   const handleClickOpen = async () => {

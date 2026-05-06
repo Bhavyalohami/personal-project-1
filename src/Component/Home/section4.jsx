@@ -15,7 +15,7 @@ const Section4 = () => {
 
             <div className="container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48 py-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8 mt-9">
                 <div className="flex flex-col bg-white py-6 rounded-lg">
-                <img  src="/assets/Home/services/service1.png"/>
+                <img src="/brand/service-icon-teal.png" alt="" />
                     <h3 className="text-[#007E85] font-dm-sans text-xl font-bold leading-7 mb-2 md:mb-4 pt-6">
                         Dental treatments
                     </h3>
@@ -32,7 +32,7 @@ const Section4 = () => {
                 </div>
 
                 <div className="flex flex-col bg-white py-6 rounded-lg">
-                <img  src="/assets/Home/services/service2.png"/>
+                <img src="/brand/service-icon-teal.png" alt="" />
                     <h3 className="text-[#007E85] font-dm-sans text-xl font-bold leading-7 mb-2 md:mb-4 pt-6">
                         Bones treatments
                     </h3>
@@ -49,7 +49,7 @@ const Section4 = () => {
                 </div>
 
                 <div className="flex flex-col bg-white py-6 rounded-lg">
-                <img  src="/assets/Home/services/service3.png"/>
+                <img src="/brand/service-icon-teal.png" alt="" />
                     <h3 className="text-[#007E85] font-dm-sans text-xl font-bold leading-7 mb-2 md:mb-4 pt-6">
                         Diagnosis
                     </h3>
@@ -66,7 +66,7 @@ const Section4 = () => {
                 </div>
 
                 <div className="flex flex-col bg-white py-6 rounded-lg">
-                <img  src="/assets/Home/services/service4.png"/>
+                <img src="/brand/service-icon-teal.png" alt="" />
                     <h3 className="text-[#007E85] font-dm-sans text-xl font-bold leading-7 mb-2 md:mb-4 pt-6">
                         Cardiology
                     </h3>
@@ -83,7 +83,7 @@ const Section4 = () => {
                 </div>
 
                 <div className="flex flex-col bg-white py-6 rounded-lg">
-                <img  src="/assets/Home/services/service5.png"/>
+                <img src="/brand/service-icon-teal.png" alt="" />
                     <h3 className="text-[#007E85] font-dm-sans text-xl font-bold leading-7 mb-2 md:mb-4 pt-6">
                         Surgery
                     </h3>
@@ -100,7 +100,7 @@ const Section4 = () => {
                 </div>
 
                 <div className="flex flex-col bg-white py-6 rounded-lg">
-                <img  src="/assets/Home/services/service6.png"/>
+                <img src="/brand/service-icon-teal.png" alt="" />
                     <h3 className="text-[#007E85] font-dm-sans text-xl font-bold leading-7 mb-2 md:mb-4 pt-6">
                         Eye care
                     </h3>

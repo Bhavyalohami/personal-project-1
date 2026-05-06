@@ -157,7 +157,7 @@
 
 //     const token = Cookies.get("token");
 //     try {
-//       const response = await axios.get(apiUrl, {
+//       await axios.get(apiUrl, {
 //         headers: {
 //           Authorization: `Token ${token}`,
 //         },
@@ -318,7 +318,7 @@
 //       });
 //       if (result?.isConfirmed) {
 //         try {
-//           const response = await axios.put(
+//           await axios.put(
 //             `${BaseUrl}clinic/vendor-profile-view/${id}/`,
 //             formDataToSend,
 //             {
@@ -429,7 +429,7 @@
 
 //       if (confirmationResult.isConfirmed) {
 //         const token = Cookies.get("token");
-//         const response = await axios.post(
+//         await axios.post(
 //           `${BaseUrl}clinic/changepassword/`,
 //           {
 //             username: username,
@@ -493,7 +493,7 @@
 //     // console.info("You clicked a breadcrumb.");
 //   }
 //   return (
-//     <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+//     <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
 //       <AdminSearch />
 
 //       <div role="presentation" onClick={handleBreadClick} className="ml-1">
@@ -517,11 +517,11 @@
 //           </Link>
 //         </Breadcrumbs>
 //       </div>
-//       <div className="w-full min-h-screen bg-[#F2F2F2] px-4 py-8 mt-3">
+//       <div className="legacy-panel-surface w-full min-h-screen px-4 py-8 mt-3">
 //         <div className="flex items-center justify-between">
-//           <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+//           <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
 //             Edit Vendor
-//           </text>
+//           </span>
 //         </div>
 //         <div>
 //           <form
@@ -992,7 +992,7 @@
 // };
 
 // export default EditVendor;
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { PhotoIcon } from "@heroicons/react/24/solid";
 import AdminSearch from "../../../Component/Admin/adminsearch";
 import { Link, useParams, useNavigate } from "react-router-dom";
@@ -1007,7 +1007,7 @@ const EditVendor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [isSuperuser, setIsSuperuser] = useState(false);
-  const [isStaff, setIsStaff] = useState(false);
+  const [, setIsStaff] = useState(false);
   const [isVendor, setIsVendor] = useState(false);
   const [formData, setFormData] = useState({
     fname: "",
@@ -1047,10 +1047,6 @@ const EditVendor = () => {
   const [countries, setCountries] = useState([]);
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
-  const countryRef = useRef(null);
-  const stateRef = useRef(null);
-  const cityRef = useRef(null);
-
   useEffect(() => {
     const fetchCountryData = async () => {
       try {
@@ -1278,6 +1274,7 @@ const EditVendor = () => {
     setIsStaff(Cookies.get("is_staff") === "true");
     setIsVendor(Cookies.get("is_vendor") === "true");
     getData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, countries]);
 
   const handleChange = (e) => {
@@ -1400,7 +1397,7 @@ const EditVendor = () => {
       if (result.isConfirmed) {
         try {
           const token = Cookies.get("token");
-          const response = await axios.put(
+          await axios.put(
             `${BaseUrl}clinic/vendor-profile-view/${id}/`,
             formDataToSend,
             {
@@ -1512,7 +1509,7 @@ const EditVendor = () => {
 
       if (confirmationResult.isConfirmed) {
         const token = Cookies.get("token");
-        const response = await axios.post(
+        await axios.post(
           `${BaseUrl}clinic/changepassword/`,
           {
             username: username,
@@ -1576,7 +1573,7 @@ const EditVendor = () => {
   }
 
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+    <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
       <AdminSearch />
 
       <div role="presentation" onClick={handleBreadClick} className="ml-1">
@@ -1600,11 +1597,11 @@ const EditVendor = () => {
           </Link>
         </Breadcrumbs>
       </div>
-      <div className="w-full min-h-screen bg-[#F2F2F2] px-4 py-8 mt-3">
+      <div className="legacy-panel-surface w-full min-h-screen px-4 py-8 mt-3">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Edit Vendor
-          </text>
+          </span>
         </div>
         <div>
           <form
@@ -1912,7 +1909,7 @@ const EditVendor = () => {
                           {imageSrc ? (
                             <img
                               src={imageSrc}
-                              alt="Image preview"
+                              alt="Preview"
                               style={{ maxWidth: "200px", maxHeight: "200px" }}
                             />
                           ) : (

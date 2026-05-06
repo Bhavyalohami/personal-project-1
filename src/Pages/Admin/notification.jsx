@@ -1,222 +1,243 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import AdminSearch from "../../Component/Admin/adminsearch";
-import DoctorSearch from "../../Component/Doctor/doctorsearch";
-import VendorSearch from "../../Component/Vendor/vendorsearch";
-import { RiNotificationBadgeFill } from "react-icons/ri";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Cookies from "js-cookie";
-import BaseUrl from "../../Api/baseurl";
-import axios from "axios";
-import { BiSolidNotificationOff } from "react-icons/bi";
-import { PiTimerBold } from "react-icons/pi";
-import { FaCalendarCheck, FaRedo, FaBan } from "react-icons/fa"; // Additional icons
-import Breadcrumbs from "@mui/material/Breadcrumbs";
-import Swal from "sweetalert2";
+import {
+  FaBell,
+  FaBoxesStacked,
+  FaCalendarCheck,
+  FaClipboardCheck,
+  FaClockRotateLeft,
+  FaShieldHeart,
+} from "react-icons/fa6";
+import EmptyState from "../../Component/Panel/EmptyState";
+import PanelPage from "../../Component/Panel/PanelPage";
+import { hmsApi } from "../../firebase/hmsService";
+import { getActiveHospitalId } from "../../utils/hmsAccess";
+
+const iconByType = {
+  inventory: <FaBoxesStacked />,
+  Booking: <FaCalendarCheck />,
+  appointment: <FaCalendarCheck />,
+  testBooking: <FaClipboardCheck />,
+  cancelled: <FaClockRotateLeft />,
+};
+
+const severityTone = {
+  warning: "bg-amber-100 text-amber-800",
+  error: "bg-rose-100 text-rose-700",
+  success: "bg-emerald-100 text-emerald-700",
+  info: "bg-cyan-100 text-cyan-800",
+};
+
+const normalizeNotification = (item, index) => ({
+  id: item.id || `notification-${index}`,
+  title: item.title || item.notification_type || item.type || "Notification",
+  message: item.message || "CareBridge update received.",
+  type: item.type || item.notification_type || "info",
+  severity: item.severity || "info",
+  createdAt: item.createdAt || item.timestamp || new Date().toISOString(),
+  isRead: Boolean(item.isRead || item.is_read),
+});
+
+const formatDateTime = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Just now" : date.toLocaleString();
+};
 
 const Notification = () => {
-  const navigate = useNavigate();
-  const [isSuperuser, setIsSuperuser] = useState(false);
-  const [isStaff, setIsStaff] = useState(false);
-  const [isVendor, setIsVendor] = useState(false);
-  const [active, setActive] = useState("recent");
+  const [activeView, setActiveView] = useState("notifications");
   const [notifications, setNotifications] = useState([]);
-  const [info, setInfo] = useState({});
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const hospitalId = getActiveHospitalId();
+  const basePath =
+    Cookies.get("is_superuser") === "true"
+      ? "/admin"
+      : Cookies.get("is_vendor") === "true"
+      ? "/vendor"
+      : "/doctor";
+
+  const loadProductionSignals = useCallback(async () => {
+    setLoading(true);
+    try {
+      const notificationData = await hmsApi.listNotifications(hospitalId).catch(() => []);
+      const auditData = await hmsApi.listAuditLogs(hospitalId).catch(() => []);
+      setNotifications(
+        Array.isArray(notificationData)
+          ? notificationData.map(normalizeNotification)
+          : [],
+      );
+      setAuditLogs(Array.isArray(auditData) ? auditData : []);
+    } catch (error) {
+      setNotifications([]);
+      setAuditLogs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [hospitalId]);
 
   useEffect(() => {
-    const superuser = Cookies.get("is_superuser") === "true";
-    const staff = Cookies.get("is_staff") === "true";
-    const vendor = Cookies.get("is_vendor") === "true";
-    setIsSuperuser(superuser);
-    setIsStaff(staff);
-    setIsVendor(vendor);
-    getData();
-  }, []);
+    loadProductionSignals();
+  }, [loadProductionSignals]);
 
-  useEffect(() => {
-    const username = Cookies.get("username");
+  const unreadCount = useMemo(
+    () => notifications.filter((item) => !item.isRead).length,
+    [notifications],
+  );
 
-    const socket = new WebSocket(
-      `ws://127.0.0.1:8001/ws/notifications/${username}/`
+  const markAsRead = (id) => {
+    setNotifications((current) =>
+      current.map((item) => (item.id === id ? { ...item, isRead: true } : item)),
     );
-
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setNotifications((prev) => [...prev, data.message]);
-    };
-
-    socket.onclose = () => {
-      console.log("WebSocket closed");
-    };
-
-    return () => {
-      socket.close();
-    };
-  }, []);
-
-  const handleNotificationClick = async (id) => {
-    try {
-      // Mark notification as read
-      await axios.put(`${BaseUrl}/clinic/notifications/mark-as-read/${id}/`);
-      // Update the notification status locally
-      setNotifications((prevNotifications) =>
-        prevNotifications.map((notification) =>
-          notification.id === id
-            ? { ...notification, is_read: true }
-            : notification
-        )
-      );
-      getData();
-    } catch (error) {
-      console.error("Error marking notification as read:", error);
-    }
   };
 
-  const getData = async () => {
-    const username = Cookies.get("username");
-    try {
-      const response = await axios.get(
-        `${BaseUrl}clinic/get-notification/${username}/`
-      );
-      setInfo(response.data.notifications);
-      // console.log(info, "info");
-    } catch (error) {
-      console.error(error);
-      if (error.code === "ERR_BAD_REQUEST") {
-        Swal.fire({
-          icon: "warning",
-          title: "Session expired. Please login again.",
-        });
-        Cookies.remove("token");
-        Cookies.remove("username");
-        Cookies.remove("is_superuser");
-        Cookies.remove("is_staff");
-        Cookies.remove("is_vendor");
-        Cookies.remove("status");
-        Cookies.remove("roles");
-        Cookies.remove("subroles");
-        if (isSuperuser) {
-          navigate("/admin/login");
-        } else if (isVendor) {
-          navigate("/vendor/login");
-        } else {
-          navigate("/doctor/login");
-        }
-      }
-    }
-  };
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case "Booking":
-        return (
-          <FaCalendarCheck className="text-[40px] bg-[#4CAF50] p-2 rounded-full text-[#ffffff]" />
-        ); // Green for booking
-      case "rescheduled":
-        return (
-          <FaRedo className="text-[40px] bg-[#FFC107] p-2 rounded-full text-[#ffffff]" />
-        ); // Yellow for rescheduled
-      case "cancelled":
-        return (
-          <FaBan className="text-[40px] bg-[#F44336] p-2 rounded-full text-[#ffffff]" />
-        ); // Red for cancelled
-      default:
-        return (
-          <RiNotificationBadgeFill className="text-[40px] bg-[#113C54] p-2 rounded-full text-[#ffffff]" />
-        ); // Default icon
-    }
-  };
-  function handleBreadClick(event) {
-    event.preventDefault();
-  }
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
-      {isSuperuser ? (
-        <AdminSearch />
-      ) : isVendor && !isStaff ? (
-        <VendorSearch />
-      ) : isVendor && isStaff ? (
-        <DoctorSearch />
-      ) : isStaff && !isVendor ? (
-        <DoctorSearch />
-      ) : null}
-      <div role="presentation" onClick={handleBreadClick} className="ml-1">
-        <Breadcrumbs separator="›" aria-label="breadcrumb">
-          <Link
-            className="hover:underline"
-            color="inherit"
-            to={isSuperuser ? "/admin/" : isVendor ? "/vendor" : "/doctor"}
+    <PanelPage
+      eyebrow="Production signals"
+      title="Notifications & audit log"
+      description="Track booking, messaging, inventory, and system events from one Firebase-ready command center."
+      breadcrumbs={[
+        { label: "Dashboard", href: basePath },
+        { label: "Notifications" },
+      ]}
+      actions={
+        <button
+          type="button"
+          onClick={loadProductionSignals}
+          className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#F59E0B] px-5 text-sm font-black text-[#134E4A]"
+        >
+          Refresh
+        </button>
+      }
+    >
+      <section className="grid gap-4 md:grid-cols-3">
+        {[
+          ["Unread", unreadCount, <FaBell />],
+          ["Audit events", auditLogs.length, <FaShieldHeart />],
+          ["Hospital", hospitalId, <FaClipboardCheck />],
+        ].map(([label, value, icon]) => (
+          <div
+            key={label}
+            className="rounded-[1.75rem] border border-[#67E8F9]/50 bg-white p-5 shadow-xl shadow-teal-900/10"
           >
-            Dashboard
-          </Link>
-          <Link className="hover:underline text-inherit" color="inherit">
-            Notifications
-          </Link>
-        </Breadcrumbs>
-      </div>
-      <div className="w-full min-h-screen bg-[#F2F2F2] px-4 py-6 mt-3">
-        {/* <div className="flex w-[0px] sm:w-full gap-4 items-center justify-start scale-[0.7] sm:scale-100">
-          <Link
-            onClick={() => handleClick("recent")}
-            className={`font-nunito-sans text-[28px] px-2 rounded-lg font-bold leading-[43.65px] text-[#202224] ${
-              active === "recent" ? "bg-[#ffffff]" : "bg-transparent"
-            }`}
-          >
-            Recent
-          </Link>
-
-          <Link
-            onClick={() => handleClick("read")}
-            className={`font-nunito-sans text-[28px] px-2 rounded-lg font-bold leading-[43.65px] text-[#202224] ${
-              active === "read" ? "bg-[#ffffff]" : "bg-transparent"
-            }`}
-          >
-            Read
-          </Link>
-
-          <Link
-            onClick={() => handleClick("unread")}
-            className={`font-nunito-sans text-[28px] px-2 rounded-lg font-bold leading-[43.65px] text-[#202224] ${
-              active === "unread" ? "bg-[#ffffff]" : "bg-transparent"
-            }`}
-          >
-            Unread
-          </Link>
-        </div> */}
-        <div className="flex flex-col">
-          <text className="font-nunito-sans text-[34px] px-2 py-4 font-extrabold leading-[43.65px] text-[#202224]">
-            Notifications
-          </text>
-
-          <div className="flex flex-col items-center w-full">
-            {info.length > 0 ? (
-              info.map((notification, index) => (
-                <div className="flex  justify-start w-full mt-3" key={index}>
-                  {getNotificationIcon(notification.notification_type)}
-                  <div className="flex items-center justify-center gap-2 flex-col ml-5 ">
-                    <div
-                      key={notification.id}
-                      style={{
-                        fontWeight: notification.is_read ? "normal" : "bold",
-                      }}
-                      onClick={() => handleNotificationClick(notification.id)}
-                    >
-                      {notification.message}
-                      <div className="font-roboto text-[12px] font-normal leading-5 text-[#717171]">
-                        {new Date(notification.timestamp).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="font-roboto text-lg font-normal leading-5 text-[#717171]">
-                No notifications available.
-              </p>
-            )}
-            <hr className="w-full my-3 border-[2px]" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ECFEFF] text-xl text-[#0D9488]">
+              {icon}
+            </div>
+            <p className="mt-4 text-3xl font-black">{value}</p>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#134E4A]/55">
+              {label}
+            </p>
           </div>
+        ))}
+      </section>
+
+      <section className="mt-6 rounded-[2rem] border border-[#67E8F9]/50 bg-white p-4 shadow-xl shadow-teal-900/10 sm:p-6">
+        <div className="mb-6 flex flex-wrap gap-3">
+          {[
+            ["notifications", "Notifications", notifications.length],
+            ["audit", "Audit log", auditLogs.length],
+          ].map(([key, label, count]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setActiveView(key)}
+              className={`inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-black transition ${
+                activeView === key
+                  ? "bg-[#0D9488] text-white"
+                  : "bg-[#ECFEFF] text-[#134E4A] hover:bg-[#67E8F9]/35"
+              }`}
+            >
+              {label}
+              <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs text-[#134E4A]">
+                {count}
+              </span>
+            </button>
+          ))}
         </div>
-      </div>
-    </div>
+
+        {loading ? (
+          <EmptyState
+            icon={<FaBell />}
+            title="Loading signals"
+            message="Fetching Firebase notification and audit streams."
+          />
+        ) : activeView === "notifications" ? (
+          notifications.length ? (
+            <div className="space-y-3">
+              {notifications.map((notification) => (
+                <button
+                  key={notification.id}
+                  type="button"
+                  onClick={() => markAsRead(notification.id)}
+                  className={`flex w-full flex-col gap-4 rounded-[1.5rem] border p-4 text-left transition md:flex-row md:items-center ${
+                    notification.isRead
+                      ? "border-[#67E8F9]/35 bg-[#ECFEFF]/45"
+                      : "border-[#0D9488]/35 bg-white shadow-lg shadow-teal-900/8"
+                  }`}
+                >
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#ECFEFF] text-xl text-[#0D9488]">
+                    {iconByType[notification.type] || <FaBell />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <strong className="text-lg">{notification.title}</strong>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${
+                          severityTone[notification.severity] || severityTone.info
+                        }`}
+                      >
+                        {notification.severity}
+                      </span>
+                    </span>
+                    <span className="mt-1 block text-sm font-semibold leading-6 text-[#134E4A]/65">
+                      {notification.message}
+                    </span>
+                  </span>
+                  <span className="text-xs font-black uppercase tracking-[0.12em] text-[#134E4A]/45">
+                    {formatDateTime(notification.createdAt)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon={<FaBell />}
+              title="No notifications yet"
+              message="Booking, chat, inventory, and test-slot alerts will appear here."
+            />
+          )
+        ) : auditLogs.length ? (
+          <div className="space-y-3">
+            {auditLogs.map((entry) => (
+              <article
+                key={entry.id}
+                className="rounded-[1.5rem] border border-[#67E8F9]/40 bg-[#ECFEFF]/45 p-4"
+              >
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-[0.16em] text-[#0D9488]">
+                      {entry.module} / {entry.action}
+                    </p>
+                    <h3 className="mt-1 text-lg font-black">{entry.summary}</h3>
+                    <p className="mt-1 text-sm font-semibold text-[#134E4A]/60">
+                      {entry.actorName || "System"} / {entry.actorRole || "system"}
+                    </p>
+                  </div>
+                  <time className="text-xs font-black uppercase tracking-[0.12em] text-[#134E4A]/45">
+                    {formatDateTime(entry.createdAt)}
+                  </time>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<FaShieldHeart />}
+            title="No audit records yet"
+            message="Role changes, inventory adjustments, bookings, and message lifecycle events should be written here in production."
+          />
+        )}
+      </section>
+    </PanelPage>
   );
 };
 

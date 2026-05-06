@@ -1,17 +1,5 @@
-import * as React from "react";
-import { useState } from "react";
-import AppointmentModal from "./Viewmodals/viewappointments";
-import { Link, useNavigate } from "react-router-dom";
-import Box from "@mui/material/Box";
-import {
-  DataGrid,
-  GridToolbar,
-  GridToolbarContainer,
-  GridToolbarExport,
-  GridToolbarFilterButton,
-  GridToolbarQuickFilter,
-} from "@mui/x-data-grid";
-import { styled } from "@mui/material/styles";
+import React, { useEffect, useState } from "react";
+import ModernDataGrid, { ModernDataGridToolbar } from "../../Component/Table/ModernDataGrid";
 import AdminSearch from "../../Component/Admin/adminsearch";
 import DoctorSearch from "../../Component/Doctor/doctorsearch";
 import VendorSearch from "../../Component/Vendor/vendorsearch";
@@ -20,48 +8,29 @@ import { IoMdEye } from "react-icons/io";
 import { MdDelete } from "react-icons/md";
 import axios from "axios";
 import Swal from "sweetalert2";
+import AppointmentModal from "./Viewmodals/viewappointments";
 import Tooltip from "@mui/material/Tooltip";
 import Cookies from "js-cookie";
 import BaseUrl from "../../Api/baseurl";
-import { useEffect } from "react";
 import { FaBan } from "react-icons/fa";
 import LoaderH from "../../Component/Loader/loader";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import { BiSolidUserDetail } from "react-icons/bi";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  filterDoctorItems,
+  isDoctorPanelFromCookies,
+} from "../../utils/doctorPanelAccess";
 
-// Custom styles for DataGrid
+const StyledDataGrid = ModernDataGrid;
 
-const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
-  "& .MuiDataGrid-root": {
-    border: "none",
-  },
-  "& .MuiDataGrid-cell": {
-    borderBottom: "1px solid #e0e0e0",
-  },
-  "& .MuiDataGrid-columnHeaders": {
-    backgroundColor: "#f5f5f5",
-  },
-  "& .MuiDataGrid-footerContainer": {
-    borderTop: "1px solid #e0e0e0",
-  },
-}));
-
-// Custom Toolbar component
-const CustomToolbar = () => (
-  <GridToolbarContainer>
-    <div className=" ">
-      <GridToolbarQuickFilter className="pt-2 min-w-[320px]" />
-    </div>
-    {/* <GridToolbarFilterButton /> */}
-    {/* <GridToolbarExport /> */}
-  </GridToolbarContainer>
-);
+const CustomToolbar = ModernDataGridToolbar;
 
 export default function Appointments() {
   const [openModal, setOpenModal] = useState(false);
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [, setError] = useState(null);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [rows, setRows] = useState([]);
   const [isSuperuser, setIsSuperuser] = useState(false);
@@ -89,22 +58,31 @@ export default function Appointments() {
     setIsVendor(vendor);
     getData();
     handleSubRoles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuperuser]);
 
   const getData = async () => {
     const username = Cookies.get("username");
+    const shouldScopeToDoctor = isDoctorPanelFromCookies();
     const apiUrl = `${BaseUrl}clinic/booking`;
 
     const token = Cookies.get("token");
     try {
       const response = await axios.get(apiUrl, {
+        params: shouldScopeToDoctor ? { username } : undefined,
         headers: {
           Authorization: `Token ${token}`,
         },
       });
 
-      setDataWithSerialNumbers(response.data.appointments);
-      setAppointments(response.data, "data");
+      const scopedAppointments = filterDoctorItems(
+        response.data?.appointments,
+        username,
+        shouldScopeToDoctor
+      );
+
+      setDataWithSerialNumbers(scopedAppointments);
+      setAppointments({ ...response.data, appointments: scopedAppointments });
       setLoading(false);
     } catch (error) {
       setError(error);
@@ -136,7 +114,7 @@ export default function Appointments() {
   };
 
   const setDataWithSerialNumbers = (data) => {
-    const dataWithSerialNumbers = data.map((item, index) => ({
+    const dataWithSerialNumbers = (Array.isArray(data) ? data : []).map((item, index) => ({
       ...item,
       __serialNumber: index + 1,
     }));
@@ -264,7 +242,7 @@ export default function Appointments() {
   //               onClick={() => handleOpenModal(params.row)}
   //               className="text-[32px]"
   //             >
-  //               <IoMdEye className="bg-[#1030A4] p-0.5 text-white rounded" />
+  //               <IoMdEye className="bg-[#0D9488] p-0.5 text-white rounded" />
   //             </button>
   //           </Tooltip>
   //         )}
@@ -299,7 +277,7 @@ export default function Appointments() {
   //               onClick={() => handleDelete(params.row.id)}
   //               className="text-[32px]"
   //             >
-  //               <MdDelete className="bg-[#F16163] p-0.5 text-white rounded" />
+  //               <MdDelete className="bg-[#0D9488] p-0.5 text-white rounded" />
   //             </button>
   //           </Tooltip>
   //         )}
@@ -357,18 +335,22 @@ export default function Appointments() {
     {
       field: "serialNumber",
       headerName: "Sr.No.",
-      width: 30,
+      minWidth: 90,
+      flex: 0.45,
       renderCell: (params) => <div>{params.row.__serialNumber}</div>,
     },
     // { field: "id", headerName: "ID", width: 90 },
-    { field: "name", headerName: "Patient Name", width: 110 },
-    { field: "date", headerName: "Appointment Date", width: 130 },
-    { field: "age", headerName: "Age", width: 80 },
-    { field: "time", headerName: "Slot", width: 120 },
+    { field: "name", headerName: "Patient Name", minWidth: 160, flex: 1 },
+    { field: "date", headerName: "Appointment Date", minWidth: 170, flex: 1 },
+    { field: "age", headerName: "Age", minWidth: 90, flex: 0.45 },
+    { field: "time", headerName: "Slot", minWidth: 140, flex: 0.8 },
     {
       field: "actions",
       headerName: "Actions",
-      width: 180,
+      minWidth: 190,
+      flex: 0.9,
+      sortable: false,
+      filterable: false,
       renderCell: (params) => (
         <div className="flex space-x-4 items-center justify-center mt-2">
           {subRoles.includes(4) && (
@@ -377,7 +359,7 @@ export default function Appointments() {
                 onClick={() => handleOpenModal(params.row)}
                 className="text-[32px]"
               >
-                <IoMdEye className="bg-[#1030A4] p-0.5 text-white rounded" />
+                <IoMdEye className="bg-[#0D9488] p-0.5 text-white rounded" />
               </button>
             </Tooltip>
           )}
@@ -412,7 +394,7 @@ export default function Appointments() {
                 onClick={() => handleDelete(params.row.id)}
                 className="text-[32px]"
               >
-                <MdDelete className="bg-[#F16163] p-0.5 text-white rounded" />
+                <MdDelete className="bg-[#0D9488] p-0.5 text-white rounded" />
               </button>
             </Tooltip>
           )}
@@ -441,7 +423,10 @@ export default function Appointments() {
           {
             field: "patientdetails",
             headerName: "Patient Details",
-            width: 120,
+            minWidth: 160,
+            flex: 0.8,
+            sortable: false,
+            filterable: false,
             renderCell: (params) => (
               <div className="flex items-center justify-center h-full">
                 {params.row.is_patient ? (
@@ -503,9 +488,9 @@ export default function Appointments() {
           </div>
           <div className="w-full min-h-screen bg-[#F2F2F2] px-4 py-4 mt-3 ">
             <div className="flex items-center justify-between pb-4">
-              <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+              <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
                 Appointments
-              </text>
+              </span>
               {subRoles.includes(1) && (
                 <Link
                   to={
@@ -522,8 +507,10 @@ export default function Appointments() {
               )}
             </div>
             <div className="bg-white">
-              <Box sx={{ width: 1 }}>
+              <div className="w-full">
                 <StyledDataGrid
+                  autoHeight
+                  disableRowSelectionOnClick
                   rows={rows}
                   columns={columns}
                   slots={{ toolbar: CustomToolbar }}
@@ -538,7 +525,7 @@ export default function Appointments() {
                     },
                   }}
                 />
-              </Box>
+              </div>
             </div>
           </div>
           {selectedAppointment && (

@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import Swal from "sweetalert2";
 import Cookies from "js-cookie";
 import BaseUrl from "../../Api/baseurl";
+import { AiFillEye, AiFillEyeInvisible } from "react-icons/ai";
+import { FaCheck, FaKey, FaShieldHeart, FaXmark } from "react-icons/fa6";
+
 const checkPasswordStrength = (password) => {
   const strength = {
     length: password.length >= 8,
@@ -14,14 +17,56 @@ const checkPasswordStrength = (password) => {
   };
 
   const score = Object.values(strength).filter(Boolean).length;
-
   return { strength, score };
 };
+
+const inputClass =
+  "h-12 w-full rounded-2xl border border-[#67E8F9]/60 bg-[#ECFEFF]/70 px-4 pr-12 text-sm font-semibold text-[#134E4A] outline-none transition placeholder:text-[#134E4A]/40 focus:border-[#0D9488] focus:bg-white focus:ring-4 focus:ring-[#67E8F9]/30";
+
+const PasswordInput = ({
+  id,
+  label,
+  value,
+  onChange,
+  error,
+  visible,
+  onToggle,
+}) => (
+  <label className="block">
+    <span className="mb-2 block text-sm font-black text-[#134E4A]">
+      {label}<span className="text-red-600">*</span>
+    </span>
+    <div className="relative">
+      <input
+        type={visible ? "text" : "password"}
+        id={id}
+        value={value}
+        onChange={onChange}
+        className={`${inputClass} ${error ? "border-red-400" : ""}`}
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute right-4 top-1/2 -translate-y-1/2 text-xl text-[#134E4A]/60"
+        aria-label={visible ? "Hide password" : "Show password"}
+      >
+        {visible ? <AiFillEyeInvisible /> : <AiFillEye />}
+      </button>
+    </div>
+    {error && <p className="mt-1 text-xs font-bold text-red-600">{error}</p>}
+  </label>
+);
+
 const PasswordChange = () => {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState({});
+  const [visible, setVisible] = useState({
+    current: false,
+    next: false,
+    confirm: false,
+  });
   const [passwordStrength, setPasswordStrength] = useState({
     strength: {},
     score: 0,
@@ -29,8 +74,19 @@ const PasswordChange = () => {
 
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const requirements = useMemo(
+    () => [
+      ["length", "At least 8 characters"],
+      ["uppercase", "Contains uppercase letter"],
+      ["lowercase", "Contains lowercase letter"],
+      ["digit", "Contains digit"],
+      ["special", "Contains special character"],
+    ],
+    []
+  );
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setErrors({});
 
     const validationErrors = {};
@@ -69,47 +125,45 @@ const PasswordChange = () => {
       setErrors(validationErrors);
       return;
     }
-    // console.log("Form is valid. Proceeding with password change...");
+
     try {
       const confirmationResult = await Swal.fire({
-        title: "Update?",
-        text: "Do you want to update Password?",
+        title: "Update password?",
+        text: "Your account password will be changed after confirmation.",
         icon: "question",
         showCancelButton: true,
-        confirmButtonText: "Yes",
-        cancelButtonText: "No",
+        confirmButtonText: "Update password",
+        cancelButtonText: "Cancel",
       });
 
       if (confirmationResult.isConfirmed) {
-        // const token = localStorage.getItem('auth_token');
         const token = Cookies.get("patient_token");
-          const response = await axios.put(
-            `${BaseUrl}clinic/changepassword/`,
-            {
-              old_password: currentPassword,
-              new_password: newPassword,
-              confirm_new_password: confirmPassword,
+        await axios.put(
+          `${BaseUrl}clinic/changepassword/`,
+          {
+            old_password: currentPassword,
+            new_password: newPassword,
+            confirm_new_password: confirmPassword,
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Token ${token}`,
             },
-            {
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Token ${token}`,
-              },
-            }
-          );
+          }
+        );
 
         Swal.fire({
-          title: "Updated Successfully",
-          text: "Password Updated Successfully",
+          title: "Updated",
+          text: "Password updated successfully.",
           icon: "success",
           confirmButtonText: "Okay",
         });
 
-        // Clear form fields
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
-        navigate("/");
+        navigate("/userprofile");
       }
     } catch (error) {
       console.error(error);
@@ -118,10 +172,11 @@ const PasswordChange = () => {
           icon: "warning",
           title: "Session expired. Please login again.",
         });
-        Cookies.remove("token");
-        Cookies.remove("username");
-        Cookies.remove("status");
+        Cookies.remove("patient_token");
+        Cookies.remove("patient_username");
+        Cookies.remove("patient_status");
         navigate("/user/login");
+        return;
       }
       Swal.fire({
         title: "Error",
@@ -137,169 +192,140 @@ const PasswordChange = () => {
     setPasswordStrength({ strength, score });
   }, [newPassword]);
 
-  const passwordStrengthClasses = [
-    passwordStrength.strength.length ? "bg-green-200" : "bg-red-200",
-    passwordStrength.strength.uppercase ? "bg-green-200" : "bg-red-200",
-    passwordStrength.strength.lowercase ? "bg-green-200" : "bg-red-200",
-    passwordStrength.strength.digit ? "bg-green-200" : "bg-red-200",
-    passwordStrength.strength.special ? "bg-green-200" : "bg-red-200",
-  ];
-  const [superuser, setSuperuser] = useState(false);
+  const toggleVisibility = (key) => {
+    setVisible((current) => ({ ...current, [key]: !current[key] }));
+  };
+
+  const progressWidth = `${(passwordStrength.score / 5) * 100}%`;
+
   return (
-    <div className="py-8 px-8 bg-[#F2F2F2] w-full">
-      <div className="w-full container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48  py-8 mt-3">
-        <div className="flex items-center justify-center">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
-            Change Password
-          </text>
+    <main className="min-h-screen bg-[#ECFEFF] text-[#134E4A]">
+      <section className="relative overflow-hidden bg-[#134E4A] px-5 py-14 text-white sm:px-8 lg:px-12">
+        <div className="absolute inset-0 care-scan-grid opacity-20" aria-hidden="true" />
+        <div className="relative mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_0.75fr] lg:items-center">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-[#67E8F9]">
+              Account security
+            </p>
+            <h1 className="mt-3 max-w-3xl text-4xl font-black leading-tight sm:text-6xl">
+              Change your password with confidence.
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-8 text-cyan-50/80">
+              Use a strong password that is unique to your CareBridge patient
+              portal.
+            </p>
+          </div>
+          <div className="rounded-[2rem] border border-white/15 bg-white/10 p-6 backdrop-blur">
+            <FaShieldHeart className="text-4xl text-[#67E8F9]" />
+            <h2 className="mt-5 text-3xl font-black">Protected access</h2>
+            <p className="mt-3 text-sm leading-7 text-cyan-50/80">
+              Password updates require your current password and explicit
+              confirmation before submitting.
+            </p>
+          </div>
         </div>
-        <div className="p-6 mt-3 rounded-lg flex w-full items-center justify-center">
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label
-                htmlFor="current-password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Current Password<span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
+      </section>
+
+      <section className="px-5 py-12 sm:px-8 lg:px-12">
+        <div className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+          <form
+            onSubmit={handleSubmit}
+            className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-6 shadow-xl shadow-teal-900/10"
+          >
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#ECFEFF] text-2xl text-[#0D9488]">
+              <FaKey />
+            </div>
+            <h2 className="mt-5 text-3xl font-black">New password</h2>
+            <div className="mt-6 grid gap-5">
+              <PasswordInput
                 id="current-password"
+                label="Current Password"
                 value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className={`mt-1 block w-full md:w-[400px] xl:w-[600px] px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
-                  errors.currentPassword ? "border-red-500" : ""
-                }`}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                error={errors.currentPassword}
+                visible={visible.current}
+                onToggle={() => toggleVisibility("current")}
               />
-              {errors.currentPassword && (
-                <p className="mt-2 text-sm text-red-600">
-                  {errors.currentPassword}
-                </p>
-              )}
-            </div>
 
-            <div className="mb-4">
-              <label
-                htmlFor="new-password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                New Password<span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
+              <PasswordInput
                 id="new-password"
+                label="New Password"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className={`mt-1 block w-full md:w-[400px] xl:w-[600px] px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
-                  errors.newPassword ? "border-red-500" : ""
-                }`}
+                onChange={(event) => setNewPassword(event.target.value)}
+                error={errors.newPassword}
+                visible={visible.next}
+                onToggle={() => toggleVisibility("next")}
               />
-              <div className="mt-2">
-                <p
-                  className={`text-sm ${
-                    passwordStrength.strength.length
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {passwordStrength.strength.length
-                    ? "✓ At least 8 characters"
-                    : "✗ At least 8 characters"}
-                </p>
-                <p
-                  className={`text-sm ${
-                    passwordStrength.strength.uppercase
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {passwordStrength.strength.uppercase
-                    ? "✓ Contains uppercase letter"
-                    : "✗ Contains uppercase letter"}
-                </p>
-                <p
-                  className={`text-sm ${
-                    passwordStrength.strength.lowercase
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {passwordStrength.strength.lowercase
-                    ? "✓ Contains lowercase letter"
-                    : "✗ Contains lowercase letter"}
-                </p>
-                <p
-                  className={`text-sm ${
-                    passwordStrength.strength.digit
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {passwordStrength.strength.digit
-                    ? "✓ Contains digit"
-                    : "✗ Contains digit"}
-                </p>
-                <p
-                  className={`text-sm ${
-                    passwordStrength.strength.special
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {passwordStrength.strength.special
-                    ? "✓ Contains special character"
-                    : "✗ Contains special character"}
-                </p>
-              </div>
-              {errors.newPassword && (
-                <p className="mt-2 text-sm text-red-600">
-                  {errors.newPassword}
-                </p>
-              )}
-            </div>
 
-            <div className="mb-6">
-              <label
-                htmlFor="confirm-password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Confirm New Password<span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
+              <PasswordInput
                 id="confirm-password"
+                label="Confirm New Password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className={`mt-1 block w-full md:w-[400px] xl:w-[600px] px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
-                  errors.confirmPassword ? "border-red-500" : ""
-                }`}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                error={errors.confirmPassword}
+                visible={visible.confirm}
+                onToggle={() => toggleVisibility("confirm")}
               />
-              {errors.confirmPassword && (
-                <p className="mt-2 text-sm text-red-600">
-                  {errors.confirmPassword}
-                </p>
-              )}
             </div>
 
-            <div className="mt-6 flex items-center justify-center gap-x-6">
-              <Link
-                to="/"
-                type="button"
-                className="text-sm font-semibold leading-6 text-gray-900"
-              >
-                Cancel
-              </Link>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
                 type="submit"
-                className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full bg-[#0D9488] px-6 text-sm font-black text-white shadow-lg shadow-teal-900/10 transition hover:bg-[#0F766E]"
               >
                 Change Password
               </button>
+              <Link
+                to="/userprofile"
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-full border border-[#67E8F9]/70 bg-white px-6 text-sm font-black text-[#134E4A] transition hover:border-[#F59E0B] hover:text-[#0D9488]"
+              >
+                Cancel
+              </Link>
             </div>
           </form>
+
+          <aside className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-6 shadow-xl shadow-teal-900/10">
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+              Strength check
+            </p>
+            <h2 className="mt-2 text-3xl font-black">
+              {passwordStrength.score >= 5 ? "Strong password" : "Build strength"}
+            </h2>
+            <div className="mt-5 overflow-hidden rounded-full bg-[#ECFEFF]">
+              <div
+                className="h-3 rounded-full bg-[#F59E0B] transition-all"
+                style={{ width: progressWidth }}
+              />
+            </div>
+
+            <div className="mt-6 grid gap-3">
+              {requirements.map(([key, label]) => {
+                const passed = Boolean(passwordStrength.strength[key]);
+                return (
+                  <div
+                    key={key}
+                    className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-black ${
+                      passed
+                        ? "border-[#0D9488]/25 bg-[#ECFEFF] text-[#134E4A]"
+                        : "border-slate-200 bg-slate-50 text-slate-500"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                        passed ? "bg-[#0D9488] text-white" : "bg-white text-slate-400"
+                      }`}
+                    >
+                      {passed ? <FaCheck /> : <FaXmark />}
+                    </span>
+                    {label}
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };
 

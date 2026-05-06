@@ -1,35 +1,33 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { GoArrowDownRight } from "react-icons/go";
+import { FaCalendarCheck, FaShieldHeart, FaUserDoctor } from "react-icons/fa6";
 import BaseUrl from "../../Api/baseurl";
-import Swal from "sweetalert2"
+import Swal from "sweetalert2";
 import Cookies from "js-cookie";
 import { useNavigate } from "react-router-dom";
+import AppointmentModal from "./appointmentmodal";
 
 const Section = () => {
   const navigate = useNavigate();
-  const [data, setData] = useState([]);
+  const [data, setData] = useState({});
   const [modalOpen, setModalOpen] = useState(false);
+
   const getData = async () => {
     const apiUrl = `${BaseUrl}clinic/configurations/`;
-    // const token = localStorage.getItem('auth_token')
     try {
-      const response = await axios.get(apiUrl, {
-        headers: {
-          // Authorization: `Token ${token}`,
-        },
-      });
-      setData(response.data);
+      const response = await axios.get(apiUrl);
+      setData(response.data || {});
     } catch (error) {
       console.error(error);
     }
   };
+
   useEffect(() => {
     getData();
   }, []);
 
   const handleBookAppointment = () => {
-    
     const token = Cookies.get("patient_token");
     if (!token) {
       Swal.fire({
@@ -47,55 +45,81 @@ const Section = () => {
         }
       });
     } else {
-      
       setModalOpen(true);
     }
   };
 
-  return (
-    <>
-      <div className="bg-[#F2EFEA]">
-        <div className="bg-[#F2EFEA]  container grid grid-cols-2 gap-1 relative h-fit px-4 md:px-8 lg:px-32 xl:px-48">
-          <div className="">
-            <div
-              className=" sec_block_1 bg-gradient-to-b from-[#1030A4] to-[#DEDEDE] inline-block text-transparent bg-clip-text
-                          w-[200px]  leading-none font-black text-lg pt-[10px]  sm:text-3xl sm:w-[255px] sm:pt-[37px] lg:w-[470px] lg:text-6xl lg:py-8"
-            >
-              {data.slogan_title}
-            </div>
+  const title =
+    data.slogan_title || "Expert healthcare, booked around your life";
+  const subtitle =
+    data.slogan_text ||
+    "Find trusted specialists, choose the right time, and manage appointments with a calm, connected care experience.";
 
-            <div className=" sec_block_2 w-[150px] text-[8px] pt-[8px] leading-0 sm:w-[300px] sm:text-xs sm:pt-[10px] md:text-[0.9rem] md:leading-[1.25rem] md:py-[16px] lg:w-[510px] lg: h-[48px]  lg:text-base xl:h-[85px] xl:pt-[23px]">
-              <p>{data.slogan_text}</p>
-            </div>
-            <div className=" sec_block_3 pt-[16px] sm:pt-[34px] md:pt-[80px] lg:pt-[67px] lg:pb-[80]  ">
-              <button
-                className=" sec_button relative px-0 py-0  text-white opacity-[70%]"
-                onClick={handleBookAppointment}
-                data-bs-toggle="modal"
-                data-bs-target="#exampleModal"
-              >
-                <span className="sec_block_3_1 bg-red-500 relative text-sm py-[8px] px-[8px] font-bold rounded-2xl flex items-center shadow-md shadow-red-500 sm:px-[12px] sm:py-[7px] lg:py-[12px] lg:px-[12px] xl:py-[12px] xl:px-[12px] xl:pl-[24px] xl:pr-[24px] ">
-                  <span className="relative sm:text-[1rem] lg:text-xl  flex justify-center items-center">
-                    Book Now{" "}
-                    <GoArrowDownRight className="sectionarrow h-8 w-8 stroke-1" />
-                  </span>
-                </span>
-              </button>
+  return (
+    <section className="relative isolate min-h-[76vh] overflow-hidden bg-[#ECFEFF] text-[#134E4A]">
+      <img
+        src="/brand/hero-care-teal.png"
+        alt=""
+        className="absolute inset-0 z-0 h-full w-full object-cover"
+        aria-hidden="true"
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(236,254,255,0.16)_0%,rgba(236,254,255,0.74)_46%,rgba(236,254,255,0.98)_100%)]" />
+      <div className="relative mx-auto flex min-h-[76vh] max-w-7xl flex-col justify-center px-5 py-20 sm:px-8 lg:px-12">
+        <div className="max-w-2xl lg:ml-auto">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#67E8F9]/70 bg-white/80 px-4 py-2 text-sm font-black text-[#134E4A] shadow-sm backdrop-blur">
+            <FaShieldHeart className="text-[#67E8F9]" />
+            Connected care for every appointment
+          </div>
+          <h1 className="max-w-3xl text-4xl font-black leading-tight text-[#134E4A] sm:text-5xl lg:text-7xl">
+            {title}
+          </h1>
+          <p className="mt-6 max-w-2xl text-base leading-8 text-[#134E4A]/80 sm:text-lg">
+            {subtitle}
+          </p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <button
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-[#0D9488] px-6 py-3 text-base font-bold text-white shadow-lg shadow-black/20 transition hover:bg-[#0F766E]"
+              onClick={handleBookAppointment}
+            >
+              Book Appointment
+              <GoArrowDownRight className="h-5 w-5" />
+            </button>
+            <button
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-[#67E8F9]/80 bg-white/80 px-6 py-3 text-base font-bold text-[#134E4A] shadow-sm backdrop-blur transition hover:border-[#0D9488] hover:text-[#0D9488]"
+              onClick={() => navigate("/ourdoctors")}
+            >
+              <FaUserDoctor />
+              Find Doctors
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-12 grid max-w-4xl grid-cols-1 gap-3 sm:grid-cols-3 lg:ml-auto">
+          <div className="flex items-center gap-3 rounded-xl border border-[#67E8F9]/60 bg-white/80 p-4 shadow-sm backdrop-blur">
+            <FaCalendarCheck className="text-2xl text-[#67E8F9]" />
+            <div>
+              <p className="text-2xl font-black">24/7</p>
+              <p className="text-sm text-[#134E4A]/70">Online booking</p>
             </div>
           </div>
-          <div className="flex justify-end">
-            <img src="/assets/Home/Section1/main.png" alt="" />
-
-            {/* <div className="w-32 bg-white px-4 py-2 rounded-[10px] text-sm font-bold text-[#1030A4]  absolute  mt-[-555px] shadow-lg shadow-[#DEDEDE]">
-              <p>+50 years of Experiences</p>
+          <div className="flex items-center gap-3 rounded-xl border border-[#67E8F9]/60 bg-white/80 p-4 shadow-sm backdrop-blur">
+            <FaUserDoctor className="text-2xl text-[#F59E0B]" />
+            <div>
+              <p className="text-2xl font-black">50+</p>
+              <p className="text-sm text-[#134E4A]/70">Specialist doctors</p>
             </div>
-            <div className="w-32 bg-white px-4 py-2 rounded-[10px] text-sm font-bold text-[#1030A4]  absolute  mt-[-133px] ml-[420px] shadow-lg shadow-[#DEDEDE] opacity-[75%]">
-              <p>Best in Neurology</p>
-            </div> */}
+          </div>
+          <div className="flex items-center gap-3 rounded-xl border border-[#67E8F9]/60 bg-white/80 p-4 shadow-sm backdrop-blur">
+            <FaShieldHeart className="text-2xl text-[#67E8F9]" />
+            <div>
+              <p className="text-2xl font-black">Secure</p>
+              <p className="text-sm text-[#134E4A]/70">Patient records</p>
+            </div>
           </div>
         </div>
       </div>
-    </>
+      <AppointmentModal modalOpen={modalOpen} setModalOpen={setModalOpen} />
+    </section>
   );
 };
 

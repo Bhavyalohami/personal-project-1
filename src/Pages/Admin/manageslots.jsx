@@ -23,13 +23,19 @@ import BaseUrl from "../../Api/baseurl";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import { FaArrowRight } from "react-icons/fa";
 import { FaArrowLeft } from "react-icons/fa";
+import {
+  doctorListForCurrentUser,
+  filterDoctorItems,
+  getDoctorDisplayName,
+  isDoctorPanelFromCookies,
+} from "../../utils/doctorPanelAccess";
 let holidays = [];
 const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const ManageSlots = () => {
   const [currentMonth, setCurrentMonth] = useState(dayjs());
   const [selectedDate, setSelectedDate] = useState({});
-  const [hoveredDate, setHoveredDate] = useState(null);
+  const [, setHoveredDate] = useState(null);
   const [bookings, setBookings] = useState({});
   const [slots, setSlots] = useState([]);
   const [slotsData, setSlotsData] = useState({});
@@ -44,9 +50,12 @@ const ManageSlots = () => {
   const [isStaff, setIsStaff] = useState(false);
   const [subRoles, setSubRoles] = useState([]);
   const [doctorlist, setDoctorlist] = useState([]);
-  const [selectedDoctor, setSelectedDoctor] = useState([]);
+  const [selectedDoctor, setSelectedDoctor] = useState("");
   const name = useRef();
   const username = Cookies.get("username");
+  const getActiveDoctorUsername = () =>
+    isDoctorPanelFromCookies() ? username : name.current;
+
   const handleSubRoles = () => {
     const subroles = Cookies.get("subroles");
     if (subroles) {
@@ -59,6 +68,14 @@ const ManageSlots = () => {
   };
 
   const handledoctorchange = (e) => {
+    if (isDoctorPanelFromCookies()) {
+      name.current = username;
+      setSelectedDoctor(username || "");
+      getData(username);
+      fetchdata(username);
+      return;
+    }
+
     const { value } = e.target;
     setSelectedDoctor(value);
     name.current = value;
@@ -75,6 +92,14 @@ const ManageSlots = () => {
   };
 
   useEffect(() => {
+    if (isDoctorPanelFromCookies() && username) {
+      name.current = username;
+      getData(username);
+      fetchdata(username);
+      setSelectedDoctor(username);
+      return;
+    }
+
     if (
       doctorlist.length > 0 &&
       doctorlist.some((doctor) => doctor.username === username)
@@ -85,7 +110,8 @@ const ManageSlots = () => {
       fetchdata(name.current);
       setSelectedDoctor(name.current);
     }
-  }, [doctorlist, username]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doctorlist, username, currentMonth]);
 
   const generateDaysInMonth = (month) => {
     const startOfMonth = month.startOf("month");
@@ -116,13 +142,20 @@ const ManageSlots = () => {
     setIsStaff(Cookies.get("is_staff") === "true");
     fetchviewdata();
     handleSubRoles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     getDoctorlist();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMonth]);
 
   const getDoctorlist = async () => {
+    if (isDoctorPanelFromCookies()) {
+      setDoctorlist(doctorListForCurrentUser(doctorlist, username));
+      return;
+    }
+
     const token = Cookies.get("token");
     const apiUrl = `${BaseUrl}clinic/doctorlist/`;
     try {
@@ -175,16 +208,25 @@ const ManageSlots = () => {
 
   const fetchviewdata = async () => {
     const apiUrl = `${BaseUrl}clinic/booking`;
+    const shouldScopeToDoctor = isDoctorPanelFromCookies();
+    const currentUsername = Cookies.get("username");
 
     const token = Cookies.get("token");
     try {
       const response = await axios.get(apiUrl, {
+        params: shouldScopeToDoctor ? { username: currentUsername } : undefined,
         headers: {
           Authorization: `Token ${token}`,
         },
       });
 
-      setAppointments(response.data.appointments, "data");
+      setAppointments(
+        filterDoctorItems(
+          response.data?.appointments,
+          currentUsername,
+          shouldScopeToDoctor
+        )
+      );
       // console.log(response.data.appointments, "Appointments details...");
     } catch (error) {
       console.log(error.code);
@@ -288,7 +330,7 @@ const ManageSlots = () => {
   };
 
   const getProgressColor = (percentage) => {
-    if (percentage == 100) {
+    if (percentage === 100) {
       return "bg-red-500";
     } else if (percentage >= 75) {
       return "bg-orange-500";
@@ -299,7 +341,7 @@ const ManageSlots = () => {
   };
 
   const getprogresscolor = (percentage,isBooked) => {
-    if (percentage == 100) {
+    if (percentage === 100) {
       return "bg-red-100";
     } else if (percentage >= 75) {
       return "bg-orange-100";
@@ -415,7 +457,7 @@ const ManageSlots = () => {
               Authorization: `Token ${token}`,
             },
           });
-          getData(name.current);
+          getData(getActiveDoctorUsername());
           Swal.fire("Deleted!", "Your Slot has been deleted.", "success");
         } catch (error) {
           console.error("Error deleting slot:", error);
@@ -450,7 +492,7 @@ const ManageSlots = () => {
       // console.log(start, end, duration);
       if (confirmation.isConfirmed) {
         try {
-          const response = await axios.put(
+          await axios.put(
             `${BaseUrl}clinic/dateslot/${slotId}/`,
             {
               start_time: start,
@@ -465,7 +507,7 @@ const ManageSlots = () => {
           );
 
           Swal.fire("Updated!", "Slot has been updated.", "success");
-          getData(name.current);
+          getData(getActiveDoctorUsername());
         } catch (error) {
           Swal.fire("Error!", "Failed to Update!", "error");
         }
@@ -490,7 +532,7 @@ const ManageSlots = () => {
     } else {
       try {
         const token = Cookies.get("token");
-        const response = await axios.patch(
+        await axios.patch(
           `${BaseUrl}clinic/dateslot/${slotId}/`,
           {
             is_active: !isActive,
@@ -501,7 +543,7 @@ const ManageSlots = () => {
             },
           }
         );
-        getData(name.current);
+        getData(getActiveDoctorUsername());
         handleUpdatedData(selectedDate.fullDate);
         Swal.fire("Updated!", "Status has Changed Successfully.", "success");
       } catch (error) {
@@ -532,7 +574,7 @@ const ManageSlots = () => {
         });
 
         Swal.fire("Deleted!", "Your file has been deleted.", "success");
-        getData(name.current);
+        getData(getActiveDoctorUsername());
       } catch (error) {
         console.error(error);
         Swal.fire("Error!", `${error}`, "error");
@@ -542,13 +584,18 @@ const ManageSlots = () => {
 
   const handleUpdatedData = (day) => {
     const selectedDateString = day;
+    if (!selectedDateString || !slots?.[selectedDateString]) {
+      setSlotsData(null);
+      return;
+    }
+
     setSlotsData(slots[selectedDateString].slots);
   };
   const handleSubSlotToggleActive = async (slotId, isActive) => {
     const token = Cookies.get("token");
 
     try {
-      const response = await axios.patch(
+      await axios.patch(
         `${BaseUrl}clinic/datesubslot/${slotId}/`,
         {
           is_active: !isActive,
@@ -560,7 +607,7 @@ const ManageSlots = () => {
         }
       );
       Swal.fire("Updated!", "Status has Changed Successfully.", "success");
-      getData(name.current);
+      getData(getActiveDoctorUsername());
     } catch (error) {
       Swal.fire("Error!", `${error}`, "error");
     }
@@ -568,6 +615,10 @@ const ManageSlots = () => {
   function handleBreadClick(event) {
     event.preventDefault();
   }
+  const doctorOnly = isDoctorPanelFromCookies();
+  const activeDoctorUsername = getActiveDoctorUsername();
+  const doctorDisplayName = getDoctorDisplayName(doctorlist, username);
+
   return (
     <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
       {isSuperuser ? (
@@ -595,9 +646,9 @@ const ManageSlots = () => {
       </div>
       <div className="w-full min-h-screen bg-[#F2F2F2]  py-4 mt-3  ">
         <div className="flex items-center justify-between pb-4 px-2 sm:!px-4">
-          <text className="font-nunito-sans text-[22px] sm:text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[22px] sm:text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Manage Slots
-          </text>
+          </span>
           {subRoles.includes(9) && (
             <Link
               to={
@@ -824,45 +875,47 @@ const ManageSlots = () => {
 
           <div className="flex flex-col py-6 mt-2 px-6 w-full xl:w-4/5">
             <div className="mb-4">
-              <label
-                htmlFor="doctor"
-                className="block text-md font-medium leading-6 text-gray-900"
-              >
-                Doctor
-                <span className="text-red-500">*</span>
-              </label>
-              <div className="mt-2">
-                <select
-                  id="doctor"
-                  name="doctor"
-                  value={selectedDoctor}
-                  onChange={handledoctorchange}
-                  disabled={
-                    doctorlist.length > 0 &&
-                    doctorlist.some((doctor) => doctor.username === username)
-                      ? true
-                      : false
-                  }
-                  autoComplete="doctor"
-                  className={`block w-full h-9 bg-white rounded-md border-0 pl-2 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600  sm:text-sm sm:leading-6 ${
-                    doctorlist.length > 0 &&
-                    doctorlist.some((doctor) => doctor.username === username)
-                      ? "cursor-not-allowed"
-                      : ""
-                  }`}
-                >
-                  {" "}
-                  <option value="">Select a doctor</option>
-                  {doctorlist.length > 0 &&
-                    doctorlist.map((doctor) => (
-                      <>
-                        <option value={doctor.username}>
-                          {doctor.fname} {doctor.lname}
-                        </option>
-                      </>
-                    ))}
-                </select>
-              </div>
+              {doctorOnly ? (
+                <div className="rounded-2xl border border-[#67E8F9]/50 bg-[#ECFEFF] p-4 shadow-sm">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                    Assigned doctor
+                  </p>
+                  <p className="mt-2 text-lg font-black text-[#134E4A]">
+                    {doctorDisplayName}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-[#134E4A]/60">
+                    You can view and update only your own slots.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <label
+                    htmlFor="doctor"
+                    className="block text-md font-medium leading-6 text-gray-900"
+                  >
+                    Doctor
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <div className="mt-2">
+                    <select
+                      id="doctor"
+                      name="doctor"
+                      value={selectedDoctor}
+                      onChange={handledoctorchange}
+                      autoComplete="doctor"
+                      className="block w-full h-9 bg-white rounded-md border-0 pl-2 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    >
+                      <option value="">Select a doctor</option>
+                      {doctorlist.length > 0 &&
+                        doctorlist.map((doctor) => (
+                          <option key={doctor.username} value={doctor.username}>
+                            {doctor.fname} {doctor.lname}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </>
+              )}
               <span className="text-red-500 mt-2 text-sm">
                 {/* {formErrors.doctor} */}
               </span>
@@ -894,9 +947,9 @@ const ManageSlots = () => {
                         className="rounded-lg border border-gray-300 p-3 mb-3"
                       >
                         <div className="flex w-full items-center justify-between">
-                          <text className="text-[32px] font-bold">
+                          <span className="text-[32px] font-bold">
                             Slot {slot.slot_number}:
-                          </text>
+                          </span>
                           <div className="flex gap-4">
                             {subRoles.includes(3) && (
                               <Tooltip title="Delete">
@@ -1161,7 +1214,7 @@ const ManageSlots = () => {
                     {subRoles.includes(1) && (
                       <FormAddDialog
                         dateName={selectedDate.fullDate}
-                        username={name.current}
+                        username={activeDoctorUsername}
                       />
                     )}
                   </div>

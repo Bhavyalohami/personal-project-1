@@ -3,7 +3,6 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Modal from "@mui/material/Modal";
 import IconButton from "@mui/material/IconButton";
-import { FaReply } from "react-icons/fa";
 import Grid from "@mui/material/Grid";
 import Divider from "@mui/material/Divider";
 import CloseIcon from "@mui/icons-material/Close";

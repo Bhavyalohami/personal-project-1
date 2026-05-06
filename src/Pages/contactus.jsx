@@ -102,7 +102,7 @@ const ContactUs = () => {
     if (!isCaptchaVerified) return; // Prevent)
 
     try {
-      const response = await axios.post(
+      await axios.post(
         `${BaseUrl}clinic/submit-contact/`,
         contactData,
         {
@@ -188,7 +188,7 @@ const ContactUs = () => {
             Contact Us
           </div>
           <div className="flex flex-col justify-center items-end">
-            <img src="/assets/Contactus/contact1.png" alt="" />
+            <img src="/brand/auth-care-teal.png" alt="" />
           </div>
         </div>
       </div>
@@ -196,14 +196,14 @@ const ContactUs = () => {
       <div className="container sticky mt-[-30px] lg:mt-[-90px] mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
         <form
           onSubmit={handleSubmit}
-          class="flex flex-col bg-white justify-center border border-gray-200  pb-12 !pt-0 lg:!pt-10 rounded-2xl !mx-0 lg:!mx-24"
+          className="flex flex-col bg-white justify-center border border-gray-200  pb-12 !pt-0 lg:!pt-10 rounded-2xl !mx-0 lg:!mx-24"
         >
           <div className="flex flex-col md:flex-row px-6 xl:px-32">
             <div className="flex flex-col w-full md:w-1/2 mt-4">
-              <text className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
+              <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
                 Name
                 <span className="text-red-500">*</span>
-              </text>
+              </span>
               <input
                 onChange={handleChange}
                 id="nameapi"
@@ -217,10 +217,10 @@ const ContactUs = () => {
               </span>
             </div>
             <div className="flex flex-col ml-0 md:ml-6 w-full md:w-1/2 mt-4">
-              <text className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
+              <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
                 Email
                 <span className="text-red-500">*</span>
-              </text>
+              </span>
               <input
                 onChange={handleChange}
                 id="emailapi"
@@ -237,10 +237,10 @@ const ContactUs = () => {
 
           <div className="flex gap-4 flex-col md:flex-row mt-4 px-6 xl:px-32">
             <div className="flex flex-col w-full md:w-1/2 ">
-              <text className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
+              <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
                 Subject
                 <span className="text-red-500">*</span>
-              </text>
+              </span>
               <input
                 onChange={handleChange}
                 id="subjectapi"
@@ -254,10 +254,10 @@ const ContactUs = () => {
               </span>
             </div>
             <div className="flex flex-col w-full md:w-1/2 ">
-              <text className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
+              <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
                 Contact Number
                 <span className="text-red-500">*</span>
-              </text>
+              </span>
               <input
                 onChange={handleChange}
                 // type='text'
@@ -276,13 +276,13 @@ const ContactUs = () => {
           </div>
 
           <div className="flex flex-col mt-4 px-6 xl:px-32">
-            <text
-              htmlfor="messageapi"
+            <span
+              htmlFor="messageapi"
               className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]"
             >
               Message
               <span className="text-red-500">*</span>
-            </text>
+            </span>
             <textarea
               onChange={handleChange}
               id="messageapi"
@@ -318,66 +318,67 @@ const ContactUs = () => {
       <div className="container flex flex-col lg:flex-row mx-auto px-4 sm:px-8 lg:px-32 xl:px-48  my-16">
         {data && (
           <div className="flex flex-col items-center lg:items-start w-full lg:w-1/3">
-            <text className="font-inter text-2xl font-semibold leading-10 text-left text-[#274760]">
+            <span className="font-inter text-2xl font-semibold leading-10 text-left text-[#274760]">
               Contact Info
-            </text>
-            <img className="mt-10" src="assets/Contactus/contact2.png" alt="" />
+            </span>
+            <img className="mt-10" src="/brand/service-icon-teal.png" alt="" />
 
-            <text className="flex items-center justify-center text-center font-inter text-lg font-semibold leading-tight text-left text-[#274760] mt-6">
+            <span className="flex items-center justify-center text-center font-inter text-lg font-semibold leading-tight text-left text-[#274760] mt-6">
               <MdLocalPhone className="mr-1 text-[18px]" />
               Phone Number
-            </text>
-            <text className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760] ml-6">
+            </span>
+            <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760] ml-6">
               (+91) {data.contact_number}
-            </text>
+            </span>
 
-            <text className="flex items-center justify-center text-center font-inter text-lg font-semibold leading-tight text-left text-[#274760] mt-6">
+            <span className="flex items-center justify-center text-center font-inter text-lg font-semibold leading-tight text-left text-[#274760] mt-6">
               <MdEmail className="mr-1 text-[18px]" />
               Email Us
-            </text>
-            <text className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760] ml-6">
+            </span>
+            <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760] ml-6">
               {data.email_address}
-            </text>
+            </span>
 
-            <text className="flex items-center justify-center text-center font-inter text-lg font-semibold leading-tight text-left text-[#274760] mt-6">
+            <span className="flex items-center justify-center text-center font-inter text-lg font-semibold leading-tight text-left text-[#274760] mt-6">
               <FaLocationDot className="mr-1 text-[18px]" />
               Our Location
-            </text>
-            <text className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760] ml-6">
+            </span>
+            <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760] ml-6">
               {data.address}
-            </text>
+            </span>
           </div>
         )}
         <div className="flex w-full lg:w-2/3 pl-0 lg:pl-8 mt-6 lg:mt-0">
-          {/* <div id="map" class="h-96"></div> */}
+          {/* <div id="map" className="h-96"></div> */}
           <iframe
             src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d28474.825843946717!2d75.7683882!3d26.8605163!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x396db501daebe0ab%3A0x9bf33abbdc8d0f98!2sAmar%20Medical%20%26%20Research%20Centre!5e0!3m2!1sen!2sin!4v1721126403454!5m2!1sen!2sin"
             className="w-full rounded-2xl"
+            title="Clinic location map"
           ></iframe>
         </div>
       </div>
 
       <div className="container grid grid-cols-1 lg:grid-cols-2 gap-6 mx-auto px-4 sm:px-8 lg:px-32 xl:px-48  my-20">
         <div>
-          <img className="w-full" src="/assets/Contactus/contact3.png" alt="" />
+          <img className="w-full" src="/brand/auth-care-teal.png" alt="" />
         </div>
         <div className="flex flex-col items-center justify-center">
-          <text className="text-[#011632] font-inter text-4xl font-bold leading-[52.5px] text-center">
+          <span className="text-[#011632] font-inter text-4xl font-bold leading-[52.5px] text-center">
             Frequently Asked Question
-          </text>
+          </span>
           <p className="text-[#011632] font-inter text-center text-lg font-normal leading-7.9 tracking-wide w-2/3 mt-2">
             We use only the best quality materials on the market in order to
             provide the best products to our patients.
           </p>
 
           <div
-            class="accordion w-full mt-8"
+            className="accordion w-full mt-8"
             id="accordionPanelsStayOpenExample"
           >
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="panelsStayOpen-headingOne">
+            <div className="accordion-item">
+              <h2 className="accordion-header" id="panelsStayOpen-headingOne">
                 <button
-                  class="accordion-button"
+                  className="accordion-button"
                   type="button"
                   data-bs-toggle="collapse"
                   data-bs-target="#panelsStayOpen-collapseOne"
@@ -389,10 +390,10 @@ const ContactUs = () => {
               </h2>
               <div
                 id="panelsStayOpen-collapseOne"
-                class="accordion-collapse collapse show visible"
+                className="accordion-collapse collapse show visible"
                 aria-labelledby="panelsStayOpen-headingOne"
               >
-                <div class="accordion-body">
+                <div className="accordion-body">
                   <p className="">
                     Most email marketing platforms provide analytics that offer
                     insights into metrics such as open rates, click-through
@@ -408,10 +409,10 @@ const ContactUs = () => {
                 </div>
               </div>
             </div>
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="panelsStayOpen-headingTwo">
+            <div className="accordion-item">
+              <h2 className="accordion-header" id="panelsStayOpen-headingTwo">
                 <button
-                  class="accordion-button collapsed"
+                  className="accordion-button collapsed"
                   type="button"
                   data-bs-toggle="collapse"
                   data-bs-target="#panelsStayOpen-collapseTwo"
@@ -423,10 +424,10 @@ const ContactUs = () => {
               </h2>
               <div
                 id="panelsStayOpen-collapseTwo"
-                class="accordion-collapse collapse visible"
+                className="accordion-collapse collapse visible"
                 aria-labelledby="panelsStayOpen-headingTwo"
               >
-                <div class="accordion-body">
+                <div className="accordion-body">
                   <p>
                     These programs often include discounted pricing or special
                     offers to support the work of non-profits. It's best to
@@ -439,10 +440,10 @@ const ContactUs = () => {
                 </div>
               </div>
             </div>
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="panelsStayOpen-headingThree">
+            <div className="accordion-item">
+              <h2 className="accordion-header" id="panelsStayOpen-headingThree">
                 <button
-                  class="accordion-button collapsed"
+                  className="accordion-button collapsed"
                   type="button"
                   data-bs-toggle="collapse"
                   data-bs-target="#panelsStayOpen-collapseThree"
@@ -454,10 +455,10 @@ const ContactUs = () => {
               </h2>
               <div
                 id="panelsStayOpen-collapseThree"
-                class="accordion-collapse collapse visible"
+                className="accordion-collapse collapse visible"
                 aria-labelledby="panelsStayOpen-headingThree"
               >
-                <div class="accordion-body">
+                <div className="accordion-body">
                   <p>
                     Becoming a member of an organization or community can be
                     highly beneficial for several reasons. Firstly, membership
@@ -470,10 +471,10 @@ const ContactUs = () => {
               </div>
             </div>
 
-            <div class="accordion-item">
-              <h2 class="accordion-header" id="panelsStayOpen-headingFour">
+            <div className="accordion-item">
+              <h2 className="accordion-header" id="panelsStayOpen-headingFour">
                 <button
-                  class="accordion-button collapsed"
+                  className="accordion-button collapsed"
                   type="button"
                   data-bs-toggle="collapse"
                   data-bs-target="#panelsStayOpen-collapseFour"
@@ -485,10 +486,10 @@ const ContactUs = () => {
               </h2>
               <div
                 id="panelsStayOpen-collapseFour"
-                class="accordion-collapse collapse visible"
+                className="accordion-collapse collapse visible"
                 aria-labelledby="panelsStayOpen-headingFour"
               >
-                <div class="accordion-body">
+                <div className="accordion-body">
                   <p>
                     Health issues are undeniably a significant concern that
                     impacts individuals, communities, and societies at large.

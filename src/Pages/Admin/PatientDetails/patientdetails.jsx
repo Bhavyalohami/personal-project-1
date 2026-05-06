@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { PhotoIcon } from "@heroicons/react/24/solid";
 import AdminSearch from "../../../Component/Admin/adminsearch";
 import DoctorSearch from "../../../Component/Doctor/doctorsearch";
 import VendorSearch from "../../../Component/Vendor/vendorsearch";
@@ -38,6 +37,7 @@ const PatientDetails = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     setIsStaff(Cookies.get("is_staff") === "true");
     getData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getData = async () => {
@@ -135,9 +135,9 @@ const PatientDetails = () => {
 
       <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Patient Details
-          </text>
+          </span>
         </div>
         <div className="flex flex-col xl:flex-row gap-4 mt-3">
           {/* <div className="flex flex-col bg-white rounded-xl w-full h-screen items-center p-4">
@@ -295,23 +295,23 @@ const PatientDetails = () => {
                       key={appointment.id}
                       className="relative flex flex-col items-start justify-start bg-[#F2F2F2] rounded-2xl p-3 w-full"
                     >
-                      <text className="text-2xl font-medium">
+                      <span className="text-2xl font-medium">
                         {appointment.doctor}
-                      </text>
-                      <text className="text-sm font-bold text-indigo-500">
+                      </span>
+                      <span className="text-sm font-bold text-indigo-500">
                         {appointment.department}
-                      </text>
+                      </span>
                       <p className="mt-3 text-base font-semibold">
                         Date:{" "}
-                        <text className="text-sm font-medium">
+                        <span className="text-sm font-medium">
                           {appointment.date}
-                        </text>
+                        </span>
                       </p>
                       <p className="text-base font-semibold">
                         Timing:{" "}
-                        <text className="text-sm font-medium">
+                        <span className="text-sm font-medium">
                           {appointment.time}
-                        </text>
+                        </span>
                       </p>
                       {/* {activeTab === 2 && (
                     <Link

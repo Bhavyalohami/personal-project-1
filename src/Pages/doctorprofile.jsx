@@ -1,43 +1,58 @@
-import React, { useState, useEffect, useRef } from "react";
-import Box from "@mui/material/Box";
-import { useParams, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Rating from "@mui/material/Rating";
+import { useNavigate, useParams } from "react-router-dom";
 import BaseUrl from "../Api/baseurl";
-import { useMediaQuery } from "@mui/material";
 import dayjs from "dayjs";
-import { Tooltip } from "@mui/material";
-import { format, set } from "date-fns";
+import { format } from "date-fns";
 import { BsFillLightningChargeFill } from "react-icons/bs";
 import axios from "axios";
 import Cookies from "js-cookie";
 import Swal from "sweetalert2";
 import parse from "html-react-parser";
 import LoaderH from "../Component/Loader/loader";
+import { requestChatWithDoctor } from "../firebase/hmsService";
 import { FaArrowLeft, FaArrowRight } from "react-icons/fa";
+import {
+  FaCalendarCheck,
+  FaComments,
+  FaHeartPulse,
+  FaLocationDot,
+  FaShieldHeart,
+  FaStar,
+  FaUserDoctor,
+} from "react-icons/fa6";
+
 const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const legendItems = [
+  ["Available", "bg-emerald-100 border-emerald-300"],
+  ["Limited", "bg-amber-100 border-amber-300"],
+  ["Unavailable", "bg-rose-100 border-rose-300"],
+  ["Holiday", "bg-slate-200 border-slate-300"],
+  ["Selected", "bg-[#0D9488] border-[#0D9488]"],
+];
 
 const DoctorProfile = () => {
   const currentTime = new Date().toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-    hour12: false, // Ensures 24-hour format
+    hour12: false,
   });
-  const currentDate = new Date();
-  const today = format(currentDate, "yyyy-MM-dd");
+  const today = format(new Date(), "yyyy-MM-dd");
   const navigate = useNavigate();
   const { id } = useParams();
-  const [loading, setLoading] = useState(false);
   const token = Cookies.get("patient_token");
+  const user = Cookies.get("patient_username") || Cookies.get("username");
+
+  const [loading, setLoading] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(dayjs());
   const [bookings, setBookings] = useState({});
   const [holidays, setHolidays] = useState([]);
-  const [hoveredDate, setHoveredDate] = useState(null);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [reviewData, setReviewData] = useState([]);
   const [slots, setSlots] = useState({});
-  const [timeslots, setTimeslots] = useState([]);
   const [subSlots, setSubSlots] = useState([]);
   const [profileData, setProfileData] = useState({
     location: "",
@@ -49,10 +64,10 @@ const DoctorProfile = () => {
     achievements: "",
     introduction: "",
     image: "",
+    yoe: "",
+    amount: "",
   });
-
-  const [overall_rating, setOverall_Rating] = useState();
-  const slotsRef = useRef();
+  const [overallRating, setOverallRating] = useState(0);
   const [formData, setFormData] = useState({
     date: "",
     time: "",
@@ -68,183 +83,31 @@ const DoctorProfile = () => {
   const [formErrors, setFormErrors] = useState({
     date: "",
     time: "",
-    // location: "",
-    // department: "",
-    // doctor: "",
-    // problem: "",
-    // username:""
   });
-  const user = Cookies.get("patient_username");
-
-  const validateform = () => {
-    const errors = {
-      date: "",
-      time: "",
-    };
-    let isValid = true;
-    if (formData.date === "" || formData.date === undefined) {
-      errors.date = "Date is required";
-      isValid = false;
-    }
-    if (formData.time === "" || formData.time === undefined) {
-      errors.time = "Time is required";
-      isValid = false;
-    }
-
-    setFormErrors(errors);
-
-    return isValid;
-  };
-
-  const handleInstantBooking = async () => {
-    const valid = validateform();
-
-    if (valid) {
-      
-      try {
-        const response = await axios.get(
-          `${BaseUrl}clinic/patient-profile/${user}/`
-        );
-        const formDatatosend = {
-          ...formData,
-          name: response.data.name,
-          age: response.data.age,
-          gender: response.data.gender,
-          contact: response.data.contact,
-          email: response.data.email,
-          city: response.data.city,
-          payment_status: 0,
-        };
-        navigate("/payment", {
-          state: {
-            appointmentDetails: formDatatosend,
-          },
-        });
-      }
-        // try {
-        //   setLoading(true);
-        //   const response = await axios.post(
-        //     `${BaseUrl}clinic/submit-appointment/`,
-        //     formDatatosend,
-        //     {
-        //       headers: {
-        //         "Content-Type": "application/json",
-        //         Authorization: `Token ${token}`,
-        //       },
-        //     }
-        //   );
-        //   setLoading(false);
-        //   Swal.fire({
-        //     title: "Success!",
-        //     html: `
-        //         <div style="text-align:left">
-        //           <p style="font-weight:bold color:blue">Your appointment is scheduled for:</p>
-        //           <p><strong>Name:</strong> ${formDatatosend.name}</p>
-        //           <p><strong>Date:</strong> ${dayjs(formData.date).format(
-        //             "DD MMMM YYYY"
-        //           )}</p>
-        //           <p><strong>Time:</strong> ${formData.time}</p>
-        //           <p><strong>Location:</strong> ${formData.location}</p>
-        //           <p><strong>Department:</strong> ${formData.department}</p>
-        //           <p><strong>Doctor:</strong> ${formData.doctor}</p>
-
-        //         </div>`,
-
-        //     icon: "success",
-        //     confirmButtonText: "OK",
-        //   });
-        //   navigate("/");
-        // } catch (error) {
-        //   setLoading(false);
-        //   console.error(error);
-        // }
-       catch (error) {
-        console.error(error);
-      }
-    }
-  };
-  const fetchdata = async () => {
-    try {
-      const response = await axios.get(`${BaseUrl}clinic/feedback-list/${id}`);
-      setProfileData(response.data.doctor);
-      setReviewData(response.data.feedback);
-      setFormData({
-        location: response.data.doctor.location,
-        department: response.data.doctor.department,
-        doctor: response.data.doctor.fname + " " + response.data.doctor.lname,
-        username: response.data.doctor.username,
-        amount: response.data.doctor.amount,
-        payment: 0,
-      });
-      // console.log(response.data.doctor.amount);
-      setOverall_Rating(response.data);
-      getSlotData(response.data.doctor.username);
-      getdata(response.data.doctor.username);
-      getdoctordata(response.data.doctor.username);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const getdoctordata = async (username) => {
-    try {
-      const year = currentMonth.year();
-      const month = currentMonth.month() + 1;
-      // const token = Cookies.get("token");
-      const apiUrl = `${BaseUrl}clinic/monthly/${year}/${month}/`;
-      const response = await axios.get(apiUrl, {
-        params: {
-          username: username,
-        },
-        // headers: {
-        //   Authorization: `Token ${token}`,
-        // },
-      });
-      setSlots(response.data);
-      slotsRef.current = response.data;
-      const updatedBookings = {};
-
-      for (const date in response.data) {
-        const total = response.data[date].total_count;
-        const booked = response.data[date].total_booked;
-
-        let allSubSlots = [];
-
-        response.data[date].slots.forEach((slot) => {
-          allSubSlots = allSubSlots.concat(slot.sub_slots);
-        });
-        updatedBookings[date] = { total, booked, subSlots: allSubSlots };
-      }
-      setBookings(updatedBookings);
-      // handleUpdatedData(selectedDate.fullDate);
-    } catch (error) {
-      console.error("Error fetching slot data:", error);
-    }
-  };
-
-  const patient_username = Cookies.get("username");
   const [feedbackData, setFeedbackData] = useState({
-    patient: patient_username,
+    patient: user,
     doctor: id,
     review: "",
     rating: "",
   });
 
-  useEffect(() => {
-    fetchdata();
-  }, [id]);
+  const doctorName = `${profileData.fname || ""} ${profileData.lname || ""}`.trim();
+  const achievementsHtml =
+    typeof profileData.achievements === "string" &&
+    profileData.achievements.trim() !== "<p><br></p>"
+      ? profileData.achievements
+      : "";
 
   const generateDaysInMonth = (month) => {
     const startOfMonth = month.startOf("month");
     const endOfMonth = month.endOf("month");
-
     let startDayOfWeek = startOfMonth.day();
     startDayOfWeek = startDayOfWeek === 0 ? 7 : startDayOfWeek;
 
     const days = [];
     let currentDay = startOfMonth;
 
-    for (let i = 1; i < startDayOfWeek; i++) {
+    for (let i = 1; i < startDayOfWeek; i += 1) {
       days.push(null);
     }
 
@@ -255,11 +118,108 @@ const DoctorProfile = () => {
 
     return days.slice(0, endOfMonth.date() + startDayOfWeek - 1);
   };
+
   const daysInMonth = generateDaysInMonth(currentMonth);
+
+  const visibleSubSlots = useMemo(
+    () =>
+      subSlots.filter((item) => {
+        if (!item.is_active) return false;
+        if (selectedDate === today && item.start_time <= currentTime) return false;
+        return true;
+      }),
+    [currentTime, selectedDate, subSlots, today]
+  );
+
+  const fetchMonthlySlots = useCallback(
+    async (username) => {
+      if (!username) return;
+
+      try {
+        const year = currentMonth.year();
+        const month = currentMonth.month() + 1;
+        const response = await axios.get(`${BaseUrl}clinic/monthly/${year}/${month}/`, {
+          params: { username },
+        });
+        const monthlyData = response.data || {};
+        const updatedBookings = {};
+
+        Object.keys(monthlyData).forEach((date) => {
+          const total = monthlyData[date].total_count;
+          const booked = monthlyData[date].total_booked;
+          const allSubSlots = (monthlyData[date].slots || []).flatMap(
+            (slot) => slot.sub_slots || []
+          );
+          updatedBookings[date] = { total, booked, subSlots: allSubSlots };
+        });
+
+        setSlots(monthlyData);
+        setBookings(updatedBookings);
+      } catch (error) {
+        console.error("Error fetching slot data:", error);
+      }
+    },
+    [currentMonth]
+  );
+
+  const fetchHolidays = useCallback(async (username) => {
+    if (!username) return;
+
+    try {
+      const response = await axios.get(`${BaseUrl}clinic/manageholiday/${username}`);
+      setHolidays(
+        (response.data || []).map((item) => ({
+          date: item.date,
+          comment: item.comment,
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching holiday data:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get(`${BaseUrl}clinic/feedback-list/${id}`);
+        const doctor = response.data.doctor || {};
+        setProfileData(doctor);
+        setReviewData(response.data.feedback || []);
+        setOverallRating(Number(response.data.overall_rating || doctor.average_rating || 0));
+        setFormData({
+          location: doctor.location || "",
+          department: doctor.department || "",
+          doctor: `${doctor.fname || ""} ${doctor.lname || ""}`.trim(),
+          username: doctor.username || "",
+          amount: doctor.amount || "",
+          payment: 0,
+          problem: "",
+          date: "",
+          time: "",
+          sub_slot: "",
+        });
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [id]);
+
+  useEffect(() => {
+    if (profileData.username) {
+      fetchMonthlySlots(profileData.username);
+      fetchHolidays(profileData.username);
+    }
+  }, [fetchHolidays, fetchMonthlySlots, profileData.username]);
 
   const getBookingInfo = (date) => {
     if (!date) return { total: 0, booked: 0, subSlots: [] };
     const bookingInfo = bookings[date.format("YYYY-MM-DD")];
+
     return bookingInfo
       ? {
           total: bookingInfo.total,
@@ -273,37 +233,18 @@ const DoctorProfile = () => {
     date &&
     holidays.some((holiday) => holiday.date === date.format("YYYY-MM-DD"));
 
-  const handleMouseEnter = (day) => {
-    if (!holidays.includes(day.format("YYYY-MM-DD"))) {
-      setHoveredDate({
-        fullDate: day.format("YYYY-MM-DD"),
-        dayOfWeek: day.format("dddd"),
-        bookingInfo: getBookingInfo(day),
-      });
-    }
-  };
-  const handleMouseLeave = () => {
-    setHoveredDate(null);
-  };
   const getProgressColor = (percentage) => {
-    if (percentage == 100) {
-      return "bg-red-500";
-    } else if (percentage >= 75) {
-      return "bg-orange-500";
-    } else if (percentage > 0) {
-      return "bg-green-500";
-    }
-    return "bg-white";
+    if (percentage === 100) return "bg-rose-500";
+    if (percentage >= 75) return "bg-amber-500";
+    if (percentage > 0) return "bg-emerald-500";
+    return "bg-[#67E8F9]";
   };
-  const getprogresscolor = (percentage, isBooked) => {
-    if (percentage == 100) {
-      return "bg-red-100";
-    } else if (percentage >= 75) {
-      return "bg-orange-100";
-    } else if (percentage > 0 || isBooked) {
-      return "bg-green-100";
-    }
-    return "bg-white";
+
+  const getProgressBackground = (percentage, isBooked) => {
+    if (percentage === 100) return "bg-rose-100 border-rose-200";
+    if (percentage >= 75) return "bg-amber-100 border-amber-200";
+    if (percentage > 0 || isBooked) return "bg-emerald-100 border-emerald-200";
+    return "bg-white border-[#67E8F9]/40";
   };
 
   const formatTime = (timeString) => {
@@ -311,134 +252,229 @@ const DoctorProfile = () => {
     return format(date, "HH:mm");
   };
 
-  const handleTimeClick = (id, start, end) => {
-    setSelectedTime(id, start, end);
+  const handleTimeClick = (slotId, start, end) => {
+    setSelectedTime(slotId);
     const timeValue = `${formatTime(start)} - ${formatTime(end)}`;
-    setFormData((prev) => ({ ...prev, time: timeValue, sub_slot: id }));
+    setFormData((prev) => ({ ...prev, time: timeValue, sub_slot: slotId }));
     setFormErrors((prevErrors) => ({ ...prevErrors, time: "" }));
   };
+
   const handleDateClick = (day) => {
     const dateString = day.format("YYYY-MM-DD");
-    if (holidays && !holidays.some((holiday) => holiday.date === dateString)) {
-      if (selectedDate === dateString) {
-        setSelectedDate("");
-        setSubSlots([]);
-        setSelectedTime("");
-        setFormData((prev) => ({ ...prev, date: "", time: "" }));
+    if (holidays.some((holiday) => holiday.date === dateString)) return;
+
+    if (selectedDate === dateString) {
+      setSelectedDate("");
+      setSubSlots([]);
+      setSelectedTime("");
+      setFormData((prev) => ({ ...prev, date: "", time: "", sub_slot: "" }));
+    } else {
+      setSelectedDate(dateString);
+      if (slots[dateString] && slots[dateString].slots) {
+        const allSubSlots = slots[dateString].slots.flatMap(
+          (slot) => slot.sub_slots || []
+        );
+        setSubSlots(allSubSlots);
       } else {
-        setSelectedDate(dateString);
-        if (slots[dateString] && slots[dateString].slots) {
-          const availableSlots = slots[dateString].slots;
-          const allSubSlots = availableSlots.flatMap(
-            (slot) => slot.sub_slots || []
-          );
-          setSubSlots(allSubSlots);
-        } else {
-          setSubSlots([]);
-        }
-        setSelectedTime("");
-        setFormData((prev) => ({ ...prev, date: dateString, time: "" }));
+        setSubSlots([]);
       }
+      setSelectedTime("");
+      setFormData((prev) => ({ ...prev, date: dateString, time: "", sub_slot: "" }));
     }
     setFormErrors((prevErrors) => ({ ...prevErrors, date: "" }));
   };
 
-  const getdata = async (username) => {
-    try {
-      const apiUrl = `${BaseUrl}clinic/manageholiday/${username}`;
-      const response = await axios.get(apiUrl);
-      setHolidays(
-        response.data.map((item) => ({
-          date: item.date,
-          comment: item.comment,
-        }))
-      );
-    } catch (error) {
-      console.error("Error fetching slot data:", error);
+  const validateForm = () => {
+    const errors = {
+      date: "",
+      time: "",
+    };
+    let isValid = true;
+
+    if (!formData.date) {
+      errors.date = "Date is required";
+      isValid = false;
+    }
+    if (!formData.time) {
+      errors.time = "Time is required";
+      isValid = false;
+    }
+
+    setFormErrors(errors);
+    return isValid;
+  };
+
+  const handleRedirect = async () => {
+    const result = await Swal.fire({
+      title: "You need to log in first to book instantly.",
+      icon: "warning",
+      confirmButtonText: "Log in",
+      cancelButtonText: "Stay here",
+      showCancelButton: true,
+      allowOutsideClick: false,
+      confirmButtonColor: "#0D9488",
+    });
+
+    if (result.isConfirmed) {
+      navigate("/user/login");
     }
   };
-  const getSlotData = async (username) => {
-    const year = currentMonth.year();
-    const month = currentMonth.month() + 1;
+
+  const handleInstantBooking = async () => {
+    if (!validateForm()) return;
+
+    if (!token) {
+      handleRedirect();
+      return;
+    }
+
+    if (!user) {
+      Swal.fire({
+        title: "Profile missing",
+        text: "Please log in again before booking.",
+        icon: "warning",
+        confirmButtonText: "OK",
+      });
+      return;
+    }
+
     try {
-      const apiUrl = `${BaseUrl}clinic/doctormonthlyslots/${username}/${year}/${month}`;
-      const response = await axios.get(apiUrl, {});
-      setSlots(response.data);
+      const response = await axios.get(`${BaseUrl}clinic/patient-profile/${user}/`);
+      const formDatatosend = {
+        ...formData,
+        name: response.data.name,
+        age: response.data.age,
+        gender: response.data.gender,
+        contact: response.data.contact,
+        email: response.data.email,
+        city: response.data.city,
+        payment_status: 0,
+      };
+      navigate("/payment", {
+        state: {
+          appointmentDetails: formDatatosend,
+        },
+      });
     } catch (error) {
-      console.error("Error fetching slot data:", error);
+      console.error(error);
+      Swal.fire({
+        title: "Could not prepare booking",
+        text: "Please try again.",
+        icon: "error",
+        confirmButtonText: "Close",
+      });
     }
   };
 
   const submitFeedback = async () => {
-    const token = Cookies.get("patient_token");
+    if (!feedbackData.rating || !feedbackData.review.trim()) {
+      Swal.fire({
+        title: "Add rating and review",
+        icon: "warning",
+        confirmButtonText: "OK",
+      });
+      return;
+    }
+
     try {
       const confirmationResult = await Swal.fire({
-        title: "Submit?",
-        text: "Do you want to submit the review?",
+        title: "Submit review?",
+        text: "Do you want to submit this review?",
         icon: "question",
         showCancelButton: true,
         confirmButtonText: "Yes",
         cancelButtonText: "No",
       });
-      if (confirmationResult.isConfirmed) {
-        setLoading(true);
-        window.scrollTo(0, 0);
-        const response = await axios.post(
-          `${BaseUrl}clinic/feedback/`,
-          feedbackData,
-          {
-            headers: {
-              Authorization: `Token ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        setLoading(false);
 
-        Swal.fire({
-          title: "Submitted Successfully",
-          text: "Review Submitted Successfully",
-          icon: "success",
-          confirmButtonText: "Okay",
-        });
-        setFeedbackData({
-          ...feedbackData,
-          rating: "",
-          review: "",
-        });
-        fetchdata();
-      }
+      if (!confirmationResult.isConfirmed) return;
+
+      setLoading(true);
+      const response = await axios.post(`${BaseUrl}clinic/feedback`, feedbackData, {
+        headers: {
+          ...(token ? { Authorization: `Token ${token}` } : {}),
+          "Content-Type": "application/json",
+        },
+      });
+
+      setReviewData((prev) => [
+        ...prev,
+        {
+          ...response.data,
+          patient: {
+            name: "You",
+            image: "/brand/patient-avatar-teal.png",
+          },
+        },
+      ]);
+      setFeedbackData({
+        patient: user,
+        doctor: id,
+        rating: "",
+        review: "",
+      });
+
+      Swal.fire({
+        title: "Submitted Successfully",
+        text: "Review submitted successfully.",
+        icon: "success",
+        confirmButtonText: "Okay",
+      });
     } catch (error) {
       Swal.fire({
-        title: "Can't Post a review",
-        text: "You cannot leave a review for this doctor, as you do not have a completed booking.",
+        title: "Can't post a review",
+        text: "You cannot leave a review for this doctor unless you have a completed booking.",
         icon: "error",
         confirmButtonText: "Okay",
       });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const [value, setValue] = useState(3);
-  const isSmallScreen = useMediaQuery("(max-width:600px)");
-  const isMediumScreen = useMediaQuery(
-    "(min-width:600px) and (max-width:960px)"
-  );
+  const handleRequestChat = async () => {
+    if (!token) {
+      navigate("/user/login");
+      return;
+    }
 
-  let ratingSize = "large";
-  if (isSmallScreen) {
-    ratingSize = "small";
-  } else if (isMediumScreen) {
-    ratingSize = "medium";
-  }
-
-  const handleRedirect = () => {
-    navigate("/user/login");
-    Swal.fire({
-      title: "You need to Login first to Book Instantly!!",
-      icon: "warning",
-      confirmButtonText: "OK",
+    const result = await Swal.fire({
+      title: "Request chat with doctor",
+      input: "textarea",
+      inputLabel: "Write a short message for the doctor",
+      inputPlaceholder: "Hello doctor, I would like to ask about...",
+      inputValue: `Hello ${doctorName || "doctor"}, I would like to chat about my care.`,
+      showCancelButton: true,
+      confirmButtonText: "Send request",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#0D9488",
     });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await requestChatWithDoctor({
+        hospitalId: profileData.hospitalId || "default-hospital",
+        doctorUid: profileData.uid || profileData.doctorUid || profileData.username || id,
+        doctorId: id,
+        doctorUsername: profileData.username || id,
+        doctorName: doctorName || profileData.name || "Doctor",
+        message: result.value,
+      });
+      const openResult = await Swal.fire({
+        title: "Request sent",
+        text: "The doctor can accept your chat request from their panel.",
+        icon: "success",
+        showCancelButton: true,
+        confirmButtonText: "Open messages",
+        cancelButtonText: "Stay here",
+        confirmButtonColor: "#0D9488",
+      });
+      if (openResult.isConfirmed) {
+        navigate("/messages");
+      }
+    } catch (error) {
+      Swal.fire("Chat request failed", error.message, "error");
+    }
   };
 
   return (
@@ -446,478 +482,428 @@ const DoctorProfile = () => {
       {loading ? (
         <LoaderH />
       ) : (
-        <>
-          <div>
-            <div className=" bg-[#F2EFEA] py-12">
-              <div className="container flex mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
-                {/* {profileData && ( */}
-                <div className="flex justify-start items-center gap-2 sm:!gap-8 w-2/3">
-                  <img
-                    className="w-[80px] h-[80px] sm:w-[150px] sm:h-[150px] rounded-full object-cover"
-                    src={profileData.image}
-                    alt="Profile Img"
-                  />
-                  <div className="flex flex-col">
-                    <text className="text-[#011632] font-inter text-[24px] sm:text-[30px] lg:text-[52px] font-bold">
-                      {profileData.fname + " " + profileData.lname}
-                    </text>
-                    <text className="font-semibold text-indigo-500 text-[12px] sm:text-[16px] lg:text-[20px]">
-                      {profileData.department}
-                    </text>
-                    <text className="font-semibold text-[14px]">
-                      {profileData.yoe} Years of Experience
-                    </text>
-                  </div>
+        <main className="overflow-hidden bg-[#ECFEFF] text-[#134E4A]">
+          <section className="relative px-5 py-12 sm:px-8 lg:px-12">
+            <div className="absolute inset-0 care-scan-grid opacity-40" aria-hidden="true" />
+            <div className="relative mx-auto grid max-w-7xl gap-8 rounded-[2rem] border border-[#67E8F9]/50 bg-white/85 p-6 shadow-2xl shadow-teal-900/10 backdrop-blur lg:grid-cols-[0.82fr_1.18fr] lg:p-10">
+              <div className="relative overflow-hidden rounded-[2rem] border border-[#67E8F9]/50 bg-[#134E4A] shadow-xl shadow-teal-900/10">
+                <img
+                  className="h-[500px] w-full object-cover"
+                  src={profileData.image || "/brand/doctor-avatar-teal.png"}
+                  alt={doctorName || "Doctor profile"}
+                />
+                <div className="absolute left-5 top-5 rounded-full bg-[#F59E0B] px-4 py-2 text-xs font-black text-[#134E4A]">
+                  ${profileData.amount || 0}
                 </div>
-                {/* )} */}
-                {overall_rating && (
-                  <div className="flex flex-col items-end justify-between w-1/3">
-                    <Box sx={{ "& > legend": { mt: 2 } }}>
-                      <Rating
-                        name="controlled"
-                        value={overall_rating.overall_rating}
-                        precision={0.5}
-                        // onChange={(event, newValue) => {
-                        //   setValue(newValue);
-                        // }}
-                        readOnly
-                        size={ratingSize}
-                      />
-                    </Box>
-                    <text className="font-medium text-white text-xs sm:text-base lg:text-lg p-2 rounded-lg bg-[#8565cf] text-center">
-                      {profileData.location}
-                    </text>
-                  </div>
-                )}
+              </div>
+
+              <div className="flex flex-col justify-center">
+                <p className="inline-flex w-max items-center gap-2 rounded-full border border-[#67E8F9]/60 bg-[#ECFEFF] px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                  <FaUserDoctor />
+                  Specialist profile
+                </p>
+                <h1 className="mt-5 text-4xl font-black leading-tight sm:text-6xl">
+                  {doctorName || "CareBridge Doctor"}
+                </h1>
+                <p className="mt-3 text-xl font-black text-[#0D9488]">
+                  {profileData.department || "Specialist"}
+                </p>
+                <p className="mt-5 max-w-2xl text-base leading-8 text-[#134E4A]/75">
+                  {profileData.introduction && profileData.introduction !== "N/A"
+                    ? profileData.introduction
+                    : "Select a live appointment slot and continue to a secure payment review."}
+                </p>
+
+                <div className="mt-7 flex flex-wrap gap-3 text-sm font-black">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-[#ECFEFF] px-4 py-2">
+                    <FaLocationDot className="text-[#0D9488]" />
+                    {profileData.location || "Clinic location"}
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-[#ECFEFF] px-4 py-2">
+                    <FaHeartPulse className="text-[#0D9488]" />
+                    {profileData.yoe || 0} years experience
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-[#ECFEFF] px-4 py-2">
+                    <FaStar className="text-[#F59E0B]" />
+                    {overallRating || 0} rating
+                  </span>
+                </div>
+
+                <div className="mt-7">
+                  <Rating
+                    name="doctor-profile-rating"
+                    value={overallRating}
+                    precision={0.5}
+                    readOnly
+                    size="large"
+                  />
+                </div>
+
+                <div className="mt-7 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={handleRequestChat}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#0D9488] px-6 text-sm font-black text-white shadow-xl shadow-teal-900/15 transition hover:bg-[#0F766E]"
+                  >
+                    <FaComments />
+                    Request Chat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = document.querySelector("#book-instantly");
+                      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#F59E0B] px-6 text-sm font-black text-[#134E4A] shadow-xl shadow-amber-900/10 transition hover:bg-[#67E8F9]"
+                  >
+                    <FaCalendarCheck />
+                    Book Appointment
+                  </button>
+                </div>
               </div>
             </div>
+          </section>
 
-            <div className="container flex flex-col gap-4 mx-auto px-4 sm:px-8 lg:px-32 xl:px-48 pt-6 pb-16">
-              <div>
-                {profileData.introduction !== "N/A" && (
-                  <div className="flex flex-col gap-3 p-3">
-                    <p className="text-2xl font-bold">Introduction</p>
-                    <div className="">
-                      <p className="font-base">{profileData.introduction}</p>
-                    </div>
-                  </div>
-                )}
-                {profileData.achievements !== "<p><br></p>" && (
-                  <div className="flex flex-col gap-3 p-3">
-                    <p className="text-2xl font-bold">Achievements & Awards</p>
-                    <div className="flex flex-col gap-3 items-start justify-center w-full">
-                      {parse(profileData.achievements)}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-3 p-3">
-                <p className="text-2xl font-bold">Book Instantly</p>
-
-                <div className="flex justify-around mt-6 flex-col md:flex-row  sm:space-x-5 rtl:space-x-reverse">
-                  <div className="flex flex-col xl:flex-row w-full h-full bg-white border border-2 !border-gray-300 p-2 rounded-3xl">
-                    <div className=" mt-4 grid grid-cols-7 w-full ">
-                      <div className=" p-2 col-span-7">
-                        <div className="flex justify-between mb-4">
-                          <Tooltip title="Previous Month">
-                            <button
-                              className="bg-blue-500 text-xs lg:text-base text-white px-2 sm:!px-4 py-2 rounded"
-                              onClick={() =>
-                                setCurrentMonth(
-                                  currentMonth.subtract(1, "month")
-                                )
-                              }
-                            >
-                              <FaArrowLeft />
-                            </button>
-                          </Tooltip>
-                          <h2 className="flex items-center justify-center text-base text-center sm:text-lg font-bold">
-                            {currentMonth.format("MMMM ")}
-                            {currentMonth.year()}
-                          </h2>
-                          <Tooltip title="Next Month">
-                            <button
-                              className="bg-blue-500 text-xs lg:text-base text-white px-2 sm:!px-4 py-2 rounded"
-                              onClick={() =>
-                                setCurrentMonth(currentMonth.add(1, "month"))
-                              }
-                            >
-                              <FaArrowRight />
-                            </button>
-                          </Tooltip>
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-2 mb-2">
-                          {dayNames.map((day, index) => (
-                            <div
-                              key={index}
-                              className="flex items-center justify-center text-center font-bold border p-2 text-gray-700"
-                            >
-                              {day}
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-2">
-                          {daysInMonth.map((day, index) => {
-                            if (!day) {
-                              return <div key={index} className="p-4"></div>;
-                            }
-                            const PastDate = dayjs(day).isBefore(
-                              dayjs(),
-                              "day"
-                            );
-                            const bookingInfo = getBookingInfo(day);
-
-                            const isBooked = bookingInfo.total > 0;
-
-                            const isHolidayDate = isHoliday(day);
-                            const percentageBooked = isBooked
-                              ? (
-                                  (bookingInfo.booked / bookingInfo.total) *
-                                  100
-                                ).toFixed(2)
-                              : 0;
-                            const progressColor =
-                              getProgressColor(percentageBooked);
-                            const progresscolor = getprogresscolor(
-                              percentageBooked,
-                              isBooked
-                            );
-                            return (
-                              <div
-                                key={index}
-                                className={`relative p-2 border text-center cursor-pointer ${
-                                  isHolidayDate
-                                    ? "bg-gray-300 text-black"
-                                    : progresscolor
-                                } ${
-                                  selectedDate === day.format("YYYY-MM-DD")
-                                    ? "border-4 !border-blue-500"
-                                    : ""
-                                }${
-                                  PastDate
-                                    ? "cursor-not-allowed cursor-banned text-gray-400 bg-white"
-                                    : ""
-                                }`}
-                                onClick={
-                                  !PastDate ? () => handleDateClick(day) : null
-                                }
-                                onMouseEnter={
-                                  !PastDate ? () => handleMouseEnter(day) : null
-                                }
-                                onMouseLeave={
-                                  !PastDate ? handleMouseLeave : null
-                                }
-                              >
-                                {!isHolidayDate ? (
-                                  <Tooltip
-                                    arrow
-                                    aria-label={`Date info for ${day.format(
-                                      "MMMM D, YYYY"
-                                    )}`}
-                                  >
-                                    <div className="w-full">
-                                      <span className="flex items-center justify-center text-lg font-bolder">
-                                        {day.format("D")}
-                                      </span>
-
-                                      <div className="hidden sm:flex relative mt-4 w-full h-2 ">
-                                        <div
-                                          className={`h-[100%] ${progressColor} rounded-full`}
-                                          // style={{
-                                          //   width: `${percentageBooked}%`,
-                                          // }}
-                                        ></div>
-                                      </div>
-                                    </div>
-                                  </Tooltip>
-                                ) : (
-                                  <Tooltip
-                                    title={
-                                      <div className="p-2">
-                                        <h3 className="text-lg font-bold">
-                                          Date Info
-                                        </h3>
-                                        <p>{`Full Date: ${day.format(
-                                          "YYYY-MM-DD"
-                                        )}`}</p>
-                                        <p>{`Day: ${day.format("dddd")}`}</p>
-                                        {holidays.find(
-                                          (holiday) =>
-                                            holiday.date ===
-                                            day.format("YYYY-MM-DD")
-                                        )?.comment !== null ? (
-                                          <h2 className="text-lg font-bold">
-                                            {
-                                              holidays.find(
-                                                (holiday) =>
-                                                  holiday.date ===
-                                                  day.format("YYYY-MM-DD")
-                                              )?.comment
-                                            }
-                                          </h2>
-                                        ) : (
-                                          <h2 className="text-lg font-bold">
-                                            No Information
-                                          </h2>
-                                        )}
-                                      </div>
-                                    }
-                                    arrow
-                                    aria-label={`Date info for ${day.format(
-                                      "MMMM D, YYYY"
-                                    )}`}
-                                  >
-                                    <div className="w-full">
-                                      <span className="flex items-center justify-center text-lg font-bolder">
-                                        {day.format("D")}
-                                      </span>
-                                      <span className="hidden sm:flex w-full items-center justify-center text-center text-xs lg:text-sm font-bold text-gray-900">
-                                        Holiday
-                                      </span>
-                                    </div>
-                                  </Tooltip>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className=" mt-4 p-3 border border-gray-300">
-                          <div className="flex gap-0 sm:!gap-6">
-                            <div className="border border-gray-300 text-[12px] w-full text-center bg-red-200 h-16 flex justify-center items-center">
-                              Not Available
-                            </div>
-                            <div className="border border-gray-300 text-[12px] w-full text-center bg-green-200 h-16 flex justify-center items-center ">
-                              Available
-                            </div>
-
-                            <div className="border border-gray-300 text-[12px] w-full text-center bg-orange-200 h-16 flex justify-center items-center">
-                              Limited Slots
-                            </div>
-                            <div className="border border-4 !border-blue-600 text-[12px] text-center w-full h-16 flex justify-center items-center">
-                              Selected Slot
-                            </div>
-                            <div className="border border-gray-300 bg-gray-300 text-[12px] text-center w-full h-16 flex justify-center items-center">
-                              Holiday
-                            </div>
-                          </div>
-                        </div>
-                        <div className="mt-3 w-full flex flex-col gap-2 items-start justify-start">
-                          <span className="font-medium ml-2">
-                            **You cannot select previous dates.
-                          </span>
-                          <span className="text-red-500 ml-2">
-                            {formErrors.date}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="w-full md:w-2/3 p-4 !ml-0 md:!ml-4 !mt-3 md:!mt-0 border-2 border-gray-300 rounded-3xl">
-                    {selectedDate !== "" ? (
-                      <h3 className="text-gray-900 text-lg font-medium mb-3 text-center">
-                        {dayjs(selectedDate).format("D - MMMM - YYYY")}
-                      </h3>
-                    ) : (
-                      <h3 className="text-gray-900 text-lg font-medium mb-3 text-center">
-                        Please Select a Date
-                      </h3>
-                    )}
-                    <text className="flex font-medium  text-gray-500 border-b border-gray-400 !w-full justify-center">
-                      Pick a Time
-                    </text>
-                    <div className="grid grid-cols-3 gap-3 mt-4">
-                      {subSlots.length > 0 ? (
-                        subSlots
-                          .filter((item) => {
-                            // Only show active slots and future time slots for today
-                            if (!item.is_active) return false;
-                            if (
-                              selectedDate === today &&
-                              item.start_time <= currentTime
-                            )
-                              return false;
-                            return true;
-                          })
-                          .map((item, index) => {
-                            const isBooked = item.is_booked;
-                            const isSelected = selectedTime === item.id;
-
-                            // Determine the class for each slot
-                            const slotClass = `relative rounded-lg border border-gray-300 h-12 text-[14px] flex justify-center items-center ${
-                              isBooked
-                                ? "bg-gray-500 text-white font-bold cursor-not-allowed"
-                                : isSelected
-                                ? "bg-blue-500 text-white font-bold cursor-pointer"
-                                : "bg-white text-gray-500 font-bold cursor-pointer"
-                            }`;
-
-                            return (
-                              <h2
-                                key={index}
-                                className={slotClass}
-                                onClick={() => {
-                                  if (!isBooked) {
-                                    handleTimeClick(
-                                      item.id,
-                                      item.start_time,
-                                      item.end_time
-                                    );
-                                  }
-                                }}
-                              >
-                                {`${formatTime(item.start_time)} - ${formatTime(
-                                  item.end_time
-                                )}`}
-                              </h2>
-                            );
-                          })
-                      ) : (
-                        <div className="col-span-3 self-center justify-self-center">
-                          <p className="text-xl font-medium text-gray-600">
-                            No available slots.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-3 mt-8 mb-4">
-                      <div className="flex items-center">
-                        <div className="bg-[#ffffff] border-[2px] rounded-lg border-black w-5 h-5 mr-2"></div>{" "}
-                        :{" "}
-                        <text className="ml-2 font-medium">
-                          Available Slots
-                        </text>
-                      </div>
-                      <div className="flex items-center">
-                        <div className="bg-[#9ca3af] border-[2px] rounded-lg border-black w-5 h-5 mr-2"></div>{" "}
-                        : <text className="ml-2 font-medium">Booked Slots</text>
-                      </div>
-                      <div className="flex items-center">
-                        <div className="bg-blue-500 border-[2px] rounded-lg border-black w-5 h-5 mr-2"></div>{" "}
-                        :{" "}
-                        <text className="ml-2 font-medium">Selected Slot</text>
-                      </div>
-                    </div>
-                    <span className="text-red-500 ml-2 mt-3">
-                      {formErrors.time}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    token ? handleInstantBooking() : handleRedirect();
-                  }}
-                  className="p-3 my-2 text-white font-bold rounded-xl flex gap-1 self-center items-center bg-[#1030A4]"
-                >
-                  Book Instantly
-                  <BsFillLightningChargeFill />
-                </button>
-              </div>
-
-              <div className="flex flex-col gap-3 p-3">
-                <p className="text-2xl font-bold text-center pb-4">
-                  What our patients say?
+          <section id="book-instantly" className="px-5 pb-16 sm:px-8 lg:px-12">
+            <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.42fr_0.58fr]">
+              <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-6 shadow-xl shadow-teal-900/10">
+                <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                  Achievements
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {reviewData.length > 0 ? (
-                    reviewData.map((item, index) => {
-                      if (item.is_active === true) {
-                        return (
-                          <div className="flex flex-col bg-[#f2f2f2] rounded-lg p-3 gap-2">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center justify-start gap-2">
-                                <img
-                                  className="w-[50px] h-[50px] rounded-full"
-                                  src={
-                                    "http://doctor-appointment-software.logicspice.com/Backend/media/" +
-                                    // "http://127.0.0.1:8000/" +
-                                    item.patient.image
-                                  }
-                                  alt=""
-                                />
-                                <p className="text-[#011632] font-inter text-lg font-bold">
-                                  {item.patient.name.split(" ")[0]}
-                                </p>
-                              </div>
-                              <Box sx={{ "& > legend": { mt: 2 } }}>
-                                <Rating
-                                  name="controlled"
-                                  value={item.rating}
-                                  precision={0.5}
-                                  // onChange={(event, newValue) => {
-                                  //   setValue(newValue);
-                                  // }}
-                                  size="small"
-                                  readOnly
-                                />
-                              </Box>
-                            </div>
-                            <div className="p-3 rounded-lg">
-                              <p className="text-sm font-medium">
-                                {item.review}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      }
-                    })
+                <h2 className="mt-2 text-3xl font-black">Care credentials</h2>
+                <div className="mt-5 space-y-4 text-sm leading-7 text-[#134E4A]/75 [&_p]:leading-7">
+                  {achievementsHtml ? (
+                    parse(achievementsHtml)
                   ) : (
-                    <div className="col-span-full">
-                      <p className="text-3xl text-gray-400 text-center font-semibold">
-                        No reviews for this doctor yet!!
-                      </p>
-                    </div>
+                    <p>Verified CareBridge specialist with clinic-ready appointment access.</p>
                   )}
                 </div>
               </div>
-              {token && (
-                <div className="flex flex-col gap-3 p-3 bg-[#eeeeee] rounded-xl">
-                  <p className="text-3xl font-bold ">Give Feedback!</p>
-                  <div className="flex flex-col gap-2 px-3 rounded-xl">
-                    <Box sx={{ "& > legend": { mt: 2 } }}>
-                      <Rating
-                        name="controlled"
-                        value={feedbackData.rating}
-                        precision={0.5}
-                        onChange={(event, newValue) => {
-                          setFeedbackData({
-                            ...feedbackData,
-                            rating: newValue,
-                          });
-                        }}
-                        size="large"
-                      />
-                    </Box>
 
-                    <textarea
-                      name="review"
-                      id="review"
-                      value={feedbackData.review}
-                      onChange={(e) => {
-                        setFeedbackData({
-                          ...feedbackData,
-                          review: e.target.value,
-                        });
-                      }}
-                      placeholder="Add a review to your Rating!"
-                      className="min-h-24 p-2"
-                    ></textarea>
+              <div className="grid gap-4 sm:grid-cols-3">
+                {[
+                  [<FaShieldHeart />, "Verified profile", "Clinic-managed specialist data"],
+                  [<FaCalendarCheck />, "Live slots", "Monthly availability and holidays"],
+                  [<FaHeartPulse />, "Patient reviews", `${reviewData.length} active reviews`],
+                ].map(([icon, title, text]) => (
+                  <article
+                    key={title}
+                    className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-5 shadow-xl shadow-teal-900/10"
+                  >
+                    <div className="text-2xl text-[#0D9488]">{icon}</div>
+                    <h3 className="mt-4 text-lg font-black">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-[#134E4A]/65">{text}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="px-5 pb-16 sm:px-8 lg:px-12">
+            <div className="mx-auto max-w-7xl">
+              <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                <div>
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                    Book instantly
+                  </p>
+                  <h2 className="mt-2 text-3xl font-black sm:text-5xl">
+                    Select a live appointment slot.
+                  </h2>
+                </div>
+                <p className="max-w-lg text-sm leading-7 text-[#134E4A]/70">
+                  Previous dates and clinic holidays are locked automatically.
+                </p>
+              </div>
+
+              <div className="grid gap-6 xl:grid-cols-[0.66fr_0.34fr]">
+                <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-4 shadow-xl shadow-teal-900/10 sm:p-6">
+                  <div className="mb-5 flex items-center justify-between gap-4">
+                    <button
+                      type="button"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ECFEFF] text-[#0D9488] transition hover:bg-[#0D9488] hover:text-white"
+                      onClick={() => setCurrentMonth(currentMonth.subtract(1, "month"))}
+                      aria-label="Previous month"
+                    >
+                      <FaArrowLeft />
+                    </button>
+                    <div className="text-center">
+                      <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                        Calendar
+                      </p>
+                      <h2 className="text-2xl font-black">
+                        {currentMonth.format("MMMM")} {currentMonth.year()}
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ECFEFF] text-[#0D9488] transition hover:bg-[#0D9488] hover:text-white"
+                      onClick={() => setCurrentMonth(currentMonth.add(1, "month"))}
+                      aria-label="Next month"
+                    >
+                      <FaArrowRight />
+                    </button>
                   </div>
 
+                  <div className="grid grid-cols-7 gap-2">
+                    {dayNames.map((day) => (
+                      <div
+                        key={day}
+                        className="rounded-xl bg-[#ECFEFF] p-2 text-center text-xs font-black uppercase tracking-wide text-[#0D9488]"
+                      >
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-7 gap-2">
+                    {daysInMonth.map((day, index) => {
+                      if (!day) return <div key={index} className="min-h-16 rounded-xl" />;
+
+                      const pastDate = dayjs(day).isBefore(dayjs(), "day");
+                      const bookingInfo = getBookingInfo(day);
+                      const isBooked = bookingInfo.total > 0;
+                      const isHolidayDate = isHoliday(day);
+                      const percentageBooked = isBooked
+                        ? Number(((bookingInfo.booked / bookingInfo.total) * 100).toFixed(2))
+                        : 0;
+                      const progressColor = getProgressColor(percentageBooked);
+                      const progressBackground = getProgressBackground(
+                        percentageBooked,
+                        isBooked
+                      );
+                      const isSelected = selectedDate === day.format("YYYY-MM-DD");
+                      const holidayComment =
+                        holidays.find((holiday) => holiday.date === day.format("YYYY-MM-DD"))
+                          ?.comment || "Holiday";
+
+                      return (
+                        <button
+                          key={day.format("YYYY-MM-DD")}
+                          type="button"
+                          disabled={pastDate || isHolidayDate}
+                          aria-label={`${day.format("DD MMM YYYY")} appointment date`}
+                          title={
+                            isHolidayDate
+                              ? holidayComment
+                              : `${day.format("DD MMM YYYY")} - ${bookingInfo.booked}/${bookingInfo.total} booked`
+                          }
+                          className={`group min-h-16 rounded-2xl border p-2 text-left transition ${
+                            isHolidayDate ? "bg-slate-200 border-slate-300" : progressBackground
+                          } ${
+                            isSelected
+                              ? "bg-[#0D9488] !text-white ring-4 ring-[#67E8F9]/40"
+                              : "text-[#134E4A] hover:-translate-y-0.5 hover:shadow-lg"
+                          } ${
+                            pastDate
+                              ? "cursor-not-allowed opacity-45 hover:translate-y-0 hover:shadow-none"
+                              : ""
+                          }`}
+                          onClick={() => handleDateClick(day)}
+                        >
+                          <span className="block text-base font-black">{day.format("D")}</span>
+                          <span className="mt-1 hidden text-[10px] font-bold uppercase tracking-wide opacity-70 sm:block">
+                            {isHolidayDate ? "Holiday" : `${bookingInfo.total || 0} slots`}
+                          </span>
+                          {!isHolidayDate && !pastDate && (
+                            <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-white/70">
+                              <span
+                                className={`block h-full rounded-full ${progressColor}`}
+                                style={{ width: `${Math.max(percentageBooked, isBooked ? 14 : 8)}%` }}
+                              />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-5 grid gap-2 sm:grid-cols-5">
+                    {legendItems.map(([label, color]) => (
+                      <div
+                        key={label}
+                        className="flex items-center gap-2 rounded-2xl bg-[#ECFEFF] px-3 py-2 text-xs font-black"
+                      >
+                        <span className={`h-3 w-3 rounded-full border ${color}`} />
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  {formErrors.date && (
+                    <p className="mt-3 text-sm font-bold text-rose-500">
+                      {formErrors.date}
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-5 shadow-xl shadow-teal-900/10 sm:p-6">
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                    Time slots
+                  </p>
+                  <h2 className="mt-2 text-2xl font-black">
+                    {selectedDate ? dayjs(selectedDate).format("DD MMMM YYYY") : "Select a date"}
+                  </h2>
+
+                  <div className="mt-6 grid grid-cols-2 gap-3 xl:grid-cols-2">
+                    {visibleSubSlots.length > 0 ? (
+                      visibleSubSlots.map((item) => {
+                        const isBooked = item.is_booked;
+                        const isSelected = selectedTime === item.id;
+
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            disabled={isBooked}
+                            className={`rounded-2xl border px-3 py-4 text-sm font-black transition ${
+                              isBooked
+                                ? "cursor-not-allowed border-slate-300 bg-slate-200 text-slate-500"
+                                : isSelected
+                                ? "border-[#0D9488] bg-[#0D9488] text-white shadow-lg shadow-teal-900/10"
+                                : "border-[#67E8F9]/60 bg-[#ECFEFF] text-[#134E4A] hover:border-[#0D9488] hover:bg-white"
+                            }`}
+                            onClick={() =>
+                              !isBooked &&
+                              handleTimeClick(item.id, item.start_time, item.end_time)
+                            }
+                          >
+                            {`${formatTime(item.start_time)} - ${formatTime(item.end_time)}`}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="col-span-full rounded-3xl border border-dashed border-[#67E8F9]/70 bg-[#ECFEFF]/70 p-8 text-center">
+                        <FaCalendarCheck className="mx-auto text-3xl text-[#0D9488]" />
+                        <p className="mt-3 text-sm font-black">
+                          {selectedDate ? "No available slots for this date." : "Pick a date to view slots."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {formErrors.time && (
+                    <p className="mt-4 text-sm font-bold text-rose-500">{formErrors.time}</p>
+                  )}
+
                   <button
-                    onClick={() => submitFeedback()}
-                    className="p-2 w-1/3 md:w-1/5 text-center self-end bg-[#F16163] hover:bg-red-500 rounded-lg cursor-pointer text-white font-semibold"
+                    type="button"
+                    onClick={handleInstantBooking}
+                    className="mt-7 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#F59E0B] px-7 text-sm font-black text-[#134E4A] shadow-xl shadow-amber-900/10 transition hover:bg-[#67E8F9]"
                   >
-                    Submit
+                    Book Instantly
+                    <BsFillLightningChargeFill />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="px-5 pb-20 sm:px-8 lg:px-12">
+            <div className="mx-auto max-w-7xl">
+              <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+                <div>
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                    Patient signal
+                  </p>
+                  <h2 className="mt-2 text-3xl font-black sm:text-5xl">
+                    What patients say.
+                  </h2>
+                </div>
+              </div>
+
+              {reviewData.length > 0 ? (
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {reviewData
+                    .filter((item) => item.is_active === true)
+                    .map((item, index) => (
+                      <article
+                        key={item.id || index}
+                        className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-5 shadow-xl shadow-teal-900/10"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <img
+                              className="h-12 w-12 rounded-2xl object-cover"
+                              src={item.patient?.image || "/brand/patient-avatar-teal.png"}
+                              alt={item.patient?.name || "Patient"}
+                            />
+                            <div>
+                              <p className="font-black">
+                                {(item.patient?.name || "Patient").split(" ")[0]}
+                              </p>
+                              <p className="text-xs font-bold text-[#134E4A]/55">
+                                Verified patient
+                              </p>
+                            </div>
+                          </div>
+                          <Rating
+                            name={`review-rating-${item.id || index}`}
+                            value={Number(item.rating || 0)}
+                            precision={0.5}
+                            size="small"
+                            readOnly
+                          />
+                        </div>
+                        <p className="mt-5 text-sm leading-7 text-[#134E4A]/70">
+                          {item.review}
+                        </p>
+                      </article>
+                    ))}
+                </div>
+              ) : (
+                <div className="rounded-[2rem] border border-[#67E8F9]/50 bg-white p-10 text-center shadow-xl shadow-teal-900/10">
+                  <FaHeartPulse className="mx-auto text-4xl text-[#0D9488]" />
+                  <h3 className="mt-4 text-2xl font-black">No reviews yet</h3>
+                  <p className="mt-3 text-sm text-[#134E4A]/70">
+                    This specialist is ready for the first CareBridge review.
+                  </p>
+                </div>
+              )}
+
+              {token && (
+                <div className="mt-8 rounded-[2rem] border border-[#67E8F9]/50 bg-white p-6 shadow-xl shadow-teal-900/10">
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                    Give feedback
+                  </p>
+                  <h3 className="mt-2 text-2xl font-black">Share your visit experience</h3>
+                  <div className="mt-5">
+                    <Rating
+                      name="feedback-rating"
+                      value={Number(feedbackData.rating || 0)}
+                      precision={0.5}
+                      onChange={(event, newValue) => {
+                        setFeedbackData({
+                          ...feedbackData,
+                          rating: newValue,
+                        });
+                      }}
+                      size="large"
+                    />
+                  </div>
+                  <textarea
+                    name="review"
+                    id="review"
+                    value={feedbackData.review}
+                    onChange={(e) => {
+                      setFeedbackData({
+                        ...feedbackData,
+                        review: e.target.value,
+                      });
+                    }}
+                    placeholder="Add a review to your rating."
+                    className="mt-4 min-h-32 w-full resize-none rounded-2xl border border-[#67E8F9]/60 bg-[#ECFEFF]/70 px-4 py-4 text-sm font-semibold leading-7 outline-none transition focus:border-[#0D9488] focus:bg-white focus:ring-4 focus:ring-[#67E8F9]/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={submitFeedback}
+                    className="mt-5 inline-flex min-h-12 items-center justify-center rounded-full bg-[#0D9488] px-7 text-sm font-black text-white transition hover:bg-[#0F766E]"
+                  >
+                    Submit Review
                   </button>
                 </div>
               )}
             </div>
-          </div>
-        </>
+          </section>
+        </main>
       )}
     </>
   );

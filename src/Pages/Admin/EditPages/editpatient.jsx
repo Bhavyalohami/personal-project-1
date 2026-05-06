@@ -22,6 +22,7 @@ const EditPatient = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     setIsStaff(Cookies.get("is_staff") === "true");
     getData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [formData, setFormData] = useState({
     name: "",
@@ -54,7 +55,7 @@ const EditPatient = () => {
     image: "",
   });
   const [error, setError] = useState("");
-  const [file, setFile] = useState(null);
+  const [, setFile] = useState(null);
   const [imageSrc, setImageSrc] = useState("");
   const calculateAge = (dob) => {
     const birthDate = new Date(dob);
@@ -263,7 +264,7 @@ const EditPatient = () => {
   //   console.log("entered in if");
 
   //   try {
-  //     const response = await axios.put(
+  //     await axios.put(
   //       `${BaseUrl}clinic/patient-list-update/${id}/`,
   //       formData,
   //       {
@@ -358,7 +359,7 @@ const EditPatient = () => {
 
 
     try {
-      const response = await axios.put(
+      await axios.put(
         `${BaseUrl}clinic/patient-list-update/${id}/`,
         formData,
         {
@@ -430,7 +431,7 @@ const EditPatient = () => {
     event.preventDefault();
   }
   return (
-    <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+    <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
       {isSuperuser ? (
         <AdminSearch />
       ) : isVendor && !isStaff ? (
@@ -471,11 +472,11 @@ const EditPatient = () => {
         </Breadcrumbs>
       </div>
 
-      <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+      <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
         <div className="flex items-center justify-between">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Edit Patient
-          </text>
+          </span>
         </div>
         <div>
           <form id="AddBlog" onSubmit={handleSubmit}>

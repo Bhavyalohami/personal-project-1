@@ -5,228 +5,91 @@ import axios from "axios";
 import parse from "html-react-parser";
 import BaseUrl from "../../Api/baseurl";
 
+const plainTextFromHtml = (value = "") => {
+  const parsed = parse(value);
+  const walk = (node) => {
+    if (Array.isArray(node)) return node.map(walk).join(" ");
+    if (typeof node === "string") return node;
+    return node?.props?.children ? walk(node.props.children) : "";
+  };
+  return walk(parsed).replace(/\s+/g, " ").trim();
+};
+
 const BlogComponent = () => {
   const [data, setData] = useState([]);
+
   const getData = async () => {
     try {
       const response = await axios.get(`${BaseUrl}clinic/blogs-list/`);
-      setData(response.data);
+      setData(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error(error);
+      setData([]);
     }
   };
+
   useEffect(() => {
     getData();
   }, []);
+
+  const posts = data.slice(0, 3);
+
   return (
-    <div className="container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48 py-16">
-      <text className="font-inter text-4xl font-semibold leading-8 text-left">
-        Blog
-      </text>
+    <section className="bg-[#ECFEFF] px-5 py-16 sm:px-8 lg:px-12">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+              Health Journal
+            </p>
+            <h2 className="mt-3 text-3xl font-black text-[#134E4A] sm:text-5xl">
+              Useful reads before your visit
+            </h2>
+          </div>
+          <Link
+            to="/blog"
+            className="inline-flex items-center gap-2 font-black text-[#0D9488] hover:text-[#0F766E]"
+          >
+            View all articles
+            <MdArrowOutward className="text-xl" />
+          </Link>
+        </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-1 mg:grid-cols-1 lg:grid-cols-1 xl:grid-cols-2 pt-10">
-        {data.slice(0, 1)?.map((i, index) => {
-          return (
-            <div className="flex flex-col pr-0 md:pr-12 lg:pr-12">
-              <img className="h-[200px] object-cover rounded-xl" src={i.image} />
-              <text className="font-inter text-base font-semibold leading-5 text-[#1030A4] mt-4">
-                {i.author} • {i.date}
-              </text>
-              <Link to="/blog">
-                <div className="w-full flex items-center justify-between">
-                  <text className="font-inter text-xl font-semibold leading-8 text-left mt-2">
-                    {i.name}
-                  </text>
-                  <MdArrowOutward className="text-xl " />
-                </div>
-              </Link>
-              <p className="font-inter text-[16px] text-[#667085] font-normal leading-6 text-left mt-2">
-                {/* {data && i.text ? (
-                  (() => {
-                    // Parse the HTML to get a React element array
-                    const parsedText = parse(i.text);
-
-                    // Extract the plain text from the parsed elements
-                    const extractText = (elements) => {
-                      if (Array.isArray(elements)) {
-                        return elements
-                          .map((element) =>
-                            typeof element === "string"
-                              ? element
-                              : element.props?.children
-                          )
-                          .join(" ");
-                      }
-                      return typeof elements === "string"
-                        ? elements
-                        : elements.props?.children || "";
-                    };
-
-                    // Get the plain text content
-                    const plainText = extractText(parsedText);
-
-                    // Split the plain text into words, take the first 12, and join them back with spaces
-                    return `${plainText.split(" ").slice(0, 12).join(" ")}...`;
-                  })()
-                ) : (
-                  <span>Loading...</span>
-                )} */}
-                {data && i.text ? (
-                  (() => {
-                    // Parse the HTML to get a React element array
-                    const parsedText = parse(i.text);
-
-                    // Extract the plain text from the parsed elements
-                    const extractText = (elements) => {
-                      if (Array.isArray(elements)) {
-                        return elements
-                          .map((element) => {
-                            // Ensure we're getting the text content as a string
-                            if (typeof element === "string") {
-                              return element;
-                            }
-                            // If it's a React element, recursively extract the text from its children
-                            return element.props?.children
-                              ? extractText(element.props.children)
-                              : "";
-                          })
-                          .join(" "); // Join the text with spaces
-                      }
-                      // Base case: If it's just a string, return it
-                      return typeof elements === "string" ? elements : "";
-                    };
-
-                    // Get the plain text content
-                    const plainText = extractText(parsedText);
-
-                    // Split the plain text into words, take the first 12, and join them back with spaces
-                    return `${plainText.split(" ").slice(0, 12).join(" ")}...`;
-                  })()
-                ) : (
-                  <span>Loading...</span>
-                )}
-              </p>
-
-              {/* <div className="flex items-center gap-8 mt-4">
-                <Link className="flex justify-center h-[24px] w-[67px] bg-[#F9F5FF] rounded-lg ">
-                  <text className="text-[#6941C6]">Tools</text>
-                </Link>
-                <Link className="flex justify-center h-[24px] w-[83px] bg-[#EEF4FF] rounded-lg">
-                  <text className="text-[#3538CD]">Research</text>
-                </Link>
-                <Link className="flex justify-center h-[24px] w-[106px] bg-[#FDF2FA] rounded-lg">
-                  <text className="text-[#C11574]">Medicine</text>
-                </Link>
-              </div> */}
-            </div>
-          );
-        })}
-
-        <div className="flex flex-col mt-8 md:mt-8 lg:mt-8 xl:mt-0">
-          {data.slice(1, 3)?.map((i, index) => {
-            return (
-              <div className="flex flex-col md:flex-row lg:flex-row mb-4    ">
+        <div className="mt-10 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {posts.map((post) => (
+            <Link
+              key={post.id || post.name}
+              to={`/blogpage/${post.id}`}
+              className="group overflow-hidden rounded-2xl border border-[#67E8F9]/40 bg-white shadow-sm transition hover:-translate-y-1 hover:border-[#0D9488] hover:shadow-xl hover:shadow-teal-900/10"
+            >
+              <div className="h-52 bg-[#ECFEFF]">
                 <img
-                  className="h-[200px] min-w-[320px]  w-[320px] rounded-xl"
-                  src={i.image}
+                  alt={post.name || "Blog post"}
+                  className="h-full w-full object-cover transition group-hover:scale-105"
+                  src={post.image || "/brand/blog-skin-care-teal.png"}
                 />
-
-                <div className="flex flex-col pl-0 md:pl-8 lg:pl-8 mt-8 md:mt-0 lg:mt-0">
-                  <text className="font-inter text-base font-semibold leading-5 text-[#1030A4]">
-                    {i.author} • {i.date}
-                  </text>
-                  <Link to="/blog">
-                    <text className="font-inter text-xl font-semibold leading-8 text-left mt-2">
-                      {i.name}
-                    </text>
-                  </Link>
-                  <p className="font-inter text-[16px] text-[#667085] font-normal leading-6 text-left mt-2">
-                    {/* {data && i.text ? (
-                      (() => {
-                        // Parse the HTML to get a React element array
-                        const parsedText = parse(i.text);
-
-                        // Extract the plain text from the parsed elements
-                        const extractText = (elements) => {
-                          if (Array.isArray(elements)) {
-                            return elements
-                              .map((element) =>
-                                typeof element === "string"
-                                  ? element
-                                  : element.props?.children
-                              )
-                              .join(" ");
-                          }
-                          return typeof elements === "string"
-                            ? elements
-                            : elements.props?.children || "";
-                        };
-
-                        // Get the plain text content
-                        const plainText = extractText(parsedText);
-
-                        // Split the plain text into words, take the first 12, and join them back with spaces
-                        return `${plainText
-                          .split(" ")
-                          .slice(0, 12)
-                          .join(" ")}...`;
-                      })()
-                    ) : (
-                      <span>Loading...</span>
-                    )} */}
-                    {data && i.text ? (
-                      (() => {
-                        // Parse the HTML to get a React element array
-                        const parsedText = parse(i.text);
-
-                        // Extract the plain text from the parsed elements
-                        const extractText = (elements) => {
-                          if (Array.isArray(elements)) {
-                            return elements
-                              .map((element) => {
-                                // Ensure we're getting the text content as a string
-                                if (typeof element === "string") {
-                                  return element;
-                                }
-                                // If it's a React element, recursively extract the text from its children
-                                return element.props?.children
-                                  ? extractText(element.props.children)
-                                  : "";
-                              })
-                              .join(" "); // Join the text with spaces
-                          }
-                          // Base case: If it's just a string, return it
-                          return typeof elements === "string" ? elements : "";
-                        };
-
-                        // Get the plain text content
-                        const plainText = extractText(parsedText);
-
-                        // Split the plain text into words, take the first 12, and join them back with spaces
-                        return `${plainText
-                          .split(" ")
-                          .slice(0, 12)
-                          .join(" ")}...`;
-                      })()
-                    ) : (
-                      <span>Loading...</span>
-                    )}
-                  </p>
-                  {/* <div className="flex gap-8 mt-4">
-                    <Link className="flex justify-center h-[24px] w-[67px] bg-[#F0F9FF] rounded-lg">
-                      <text className="text-[#026AA2]">Tips</text>
-                    </Link>
-                    <Link className="flex justify-center h-[24px] w-[83px] bg-[#FDF2FA] rounded-lg">
-                      <text className="text-[#C11574]">Health</text>
-                    </Link>
-                  </div> */}
-                </div>
               </div>
-            );
-          })}
+              <div className="p-6">
+                <p className="text-sm font-black text-[#0D9488]">
+                  {post.author} | {post.date}
+                </p>
+                <h3 className="mt-3 text-xl font-black leading-7 text-[#134E4A]">
+                  {post.name}
+                </h3>
+                <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
+                  {plainTextFromHtml(post.text).split(" ").slice(0, 24).join(" ")}
+                  ...
+                </p>
+                <span className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[#0D9488]">
+                  Read article
+                  <MdArrowOutward className="transition group-hover:translate-x-1" />
+                </span>
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

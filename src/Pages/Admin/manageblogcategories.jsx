@@ -1,13 +1,5 @@
-import * as React from "react";
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import Box from "@mui/material/Box";
-import {
-  DataGrid,
-  GridToolbarContainer,
-  GridToolbarQuickFilter,
-} from "@mui/x-data-grid";
-import { styled } from "@mui/material/styles";
+import React, { useState } from "react";
+import ModernDataGrid, { ModernDataGridToolbar } from "../../Component/Table/ModernDataGrid";
 import AdminSearch from "../../Component/Admin/adminsearch";
 import DoctorSearch from "../../Component/Doctor/doctorsearch";
 import VendorSearch from "../../Component/Vendor/vendorsearch";
@@ -20,38 +12,17 @@ import axios from "axios";
 import Cookies from "js-cookie";
 import BaseUrl from "../../Api/baseurl";
 import Tooltip from "@mui/material/Tooltip";
-import parse from "html-react-parser";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import { FaBan, FaCheck } from "react-icons/fa";
+import { Link, useNavigate } from "react-router-dom";
 
-// Custom styles for DataGrid
-const StyledDataGrid = styled(DataGrid)(({ theme }) => ({
-  "& .MuiDataGrid-root": {
-    border: "none",
-  },
-  "& .MuiDataGrid-cell": {
-    borderBottom: "1px solid #e0e0e0",
-  },
-  "& .MuiDataGrid-columnHeaders": {
-    backgroundColor: "#f5f5f5",
-  },
-  "& .MuiDataGrid-footerContainer": {
-    borderTop: "1px solid #e0e0e0",
-  },
-}));
+const StyledDataGrid = ModernDataGrid;
 
-// Custom Toolbar component
-const CustomToolbar = () => (
-  <GridToolbarContainer>
-    <div className=" ">
-      <GridToolbarQuickFilter className="pt-2 min-w-[320px]" />
-    </div>
-  </GridToolbarContainer>
-);
+const CustomToolbar = ModernDataGridToolbar;
 const ManageBlogCategories = () => {
-  const [blogCategory, setBlogCategory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [, setBlogCategory] = useState([]);
+  const [, setLoading] = useState(true);
+  const [, setError] = useState(null);
   const [openModal, setOpenModal] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
@@ -127,6 +98,7 @@ const ManageBlogCategories = () => {
     setIsVendor(Cookies.get("is_vendor") === "true");
     getData();
     handleSubRoles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleOpenModal = (service) => {
@@ -248,7 +220,7 @@ const ManageBlogCategories = () => {
                 onClick={() => handleOpenModal(params.row)}
                 className="text-[32px]"
               >
-                <IoMdEye className="bg-[#1030A4] p-0.5 text-white rounded" />
+                <IoMdEye className="bg-[#0D9488] p-0.5 text-white rounded" />
               </button>
             </Tooltip>
           )}
@@ -274,7 +246,7 @@ const ManageBlogCategories = () => {
                 onClick={() => handleDelete(params.row.id)}
                 className="text-[32px]"
               >
-                <MdDelete className="bg-[#F16163] p-0.5 text-white rounded" />
+                <MdDelete className="bg-[#0D9488] p-0.5 text-white rounded" />
               </button>
             </Tooltip>
           )}
@@ -333,9 +305,9 @@ const ManageBlogCategories = () => {
       </div>
       <div className="w-full bg-[#F2F2F2] px-4 py-4 mt-3">
         <div className="flex items-center justify-between pb-4">
-          <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+          <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
             Manage Blog Categories
-          </text>
+          </span>
           {subRoles.includes(1) && (
             <Link
               to={
@@ -352,7 +324,7 @@ const ManageBlogCategories = () => {
           )}
         </div>
         <div className=" bg-white">
-          <Box sx={{ width: 1 }}>
+          <div className="w-full">
             <StyledDataGrid
               rows={rows}
               columns={columns}
@@ -367,7 +339,7 @@ const ManageBlogCategories = () => {
                 },
               }}
             />
-          </Box>
+          </div>
         </div>
       </div>
 

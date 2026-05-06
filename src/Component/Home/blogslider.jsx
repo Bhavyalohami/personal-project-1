@@ -1,9 +1,6 @@
 import OwlCarousel from "react-owl-carousel";
 import "owl.carousel/dist/assets/owl.carousel.css";
 import "owl.carousel/dist/assets/owl.theme.default.css";
-import { LuFacebook } from "react-icons/lu";
-import { FaInstagram } from "react-icons/fa";
-import { FiTwitter } from "react-icons/fi";
 import { Link } from "react-router-dom";
 
 
@@ -34,9 +31,9 @@ const BlogSlider = () => {
                         <img className="w-full h-full self-center" src={i.img} alt="" />
                         <div className="flex justify-between items-center w-full">
                         <button className="w-[97px] h-[39px] text-[#ffffff] bg-[#011632] rounded mt-4 py-1.5 font-medium">{i.btn}</button>
-                        <text className="text-[#011632] font-general-sans text-sm font-normal leading-6 tracking-tighter text-right mt-4">{i.Author}</text>
+                        <span className="text-[#011632] font-general-sans text-sm font-normal leading-6 tracking-tighter text-right mt-4">{i.Author}</span>
                         </div>
-                        <text className="text-[#011632] w-full  font-general-sans text-base font-medium leading-27.9 tracking-wide text-left mt-4">{i.title}</text>
+                        <span className="text-[#011632] w-full  font-general-sans text-base font-medium leading-27.9 tracking-wide text-left mt-4">{i.title}</span>
                         <p className="text-[#3C4959] font-general-sans text-base font-normal leading-27.9 tracking-wide text-left mt-2">{i.Description}</p>
                     </div>
                       </div>
@@ -92,21 +89,21 @@ const options = {
   
   const data = [
     {
-      img: "/assets/Blog/slider1.png",
+      img: "/brand/blog-skin-care-teal.png",
       btn: `Self Care`,
       title: `Points towards personal care.`,
       Description: `Lorem ipsum dolor sit amet consectetur.`,
       Author: `~Anita Jackson`,
     },
     {
-      img: "/assets/Blog/slider2.png",
+      img: "/brand/blog-skin-care-teal.png",
       btn: `Dental`,
       title: `Care of your Teeth to and Smile`,
       Description: `Lorem ipsum dolor sit amet consectetur.`,
       Author: `~Tom Willson`,
     },
     {
-      img: "/assets/Blog/slider3.png",
+      img: "/brand/blog-skin-care-teal.png",
       btn: `Mental`,
       title: `Solving your mental problems`,
       Description: `Lorem ipsum dolor sit amet consectetur.`,

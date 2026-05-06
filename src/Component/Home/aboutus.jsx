@@ -1,34 +1,89 @@
-import { GoArrowDownRight } from "react-icons/go";
 import { Link } from "react-router-dom";
-import { MdPhoneInTalk } from "react-icons/md";
+import { GoArrowDownRight } from "react-icons/go";
+import { FaCalendarCheck, FaHeartPulse, FaUserDoctor } from "react-icons/fa6";
 
 const AboutUs = () => {
-    return (
-        <div className="bg-gradient-to-r from-blue-100 via-blue-200 to-blue-100 py-16">
-            <div className="container mx-auto px-4 sm:px-8 lg:px-32 xl:px-48 grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-                <div className="flex flex-col items-center">
-                    <img className="h-80 w-96 lg:self-start" src="/assets/Home/aboutus/about1.png" alt="AboutUs1"/>
-                    <img className="h-80 w-96 lg:self-end mt-16" src="/assets/Home/aboutus/about2.png" alt="AboutUs2"/>
-                    <div className="absolute mt-72 ml-44 bg-[#ffffff] p-2 sm:p-2 md:p-4 rounded-lg">
-                        <div className="flex items-center font-inter text-base lg:text-lg font-bold leading-6 lg:leading-[27px] text-left text-[#1B3C74]"> <MdPhoneInTalk className="h-[34px] w-[34px] p-1 rounded mr-2 text-[#ffffff] bg-[#F16163]"/>Free Consultation</div>
-                        <div className="font-inter text-base lg:text-base font-medium leading-6 text-left text-[#77829D]">Consultation with the best</div>
-                    </div>
-                </div>
-
-                
-                <div className="flex flex-col justify-center">
-                    <div className="text-[#1030A4] font-inter text-[20px] font-medium lg:text-xl leading-[24.2px] lg:leading-[28px] text-left">About Us</div>
-                    <div className="font-inter text-[36px] lg:text-[48px] font-semibold leading-43.57 lg:leading-[58px] text-left mt-2 lg:mt-4">Patient-Centered-Care</div>
-                    <div className="font-inter text-[20px] lg:text-lg font-normal leading-7 lg:leading-[32px] text-left mt-4 lg:mt-8">We are dedicated to providing exceptional dental care in a warm and welcoming environment. Our team of experienced, compassionate, and highly skilled professionals is here to ensure your dental experience is comfortable and stress-free.</div>
-
-                    <div className="font-inter text-[24px] lg:text-[32px] font-semibold leading-10 lg:leading-[40px] text-left mt-8 lg:mt-12">Our Mission</div>
-                    <div className="font-inter text-[20px] lg:text-lg font-normal leading-7 lg:leading-[32px] text-left mt-2 lg:mt-4">At 57Dentcare, our mission is to promote optimal oral health and create lasting, confident smiles. </div>
-                    <Link to="/about" className="flex mt-8 lg:mt-12 w-full lg:w-[230px] h-[75px] p-[25px] rounded-[35px] border-[2px] border-red-600 shadow-2xl bg-red-600 hover:bg-red-500 text-[#ffffff] font-poppins text-[20px] lg:text-lg font-semibold leading-7 lg:leading-[32px] tracking-wide text-center justify-center items-center opacity-[65%] shadow-xl shadow-red-600/70">Learn More<GoArrowDownRight className="h-8 w-8 stroke-1"/></Link>
-                </div>
+  return (
+    <section className="bg-[#ECFEFF] px-5 py-16 sm:px-8 lg:px-12">
+      <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[0.95fr_1.05fr]">
+        <div className="relative min-h-[500px] overflow-hidden rounded-2xl bg-[#134E4A] p-6 text-white shadow-xl shadow-teal-900/10">
+          <img
+            src="/brand/consultation-care-teal.png"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-70"
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(145deg,rgba(19,78,74,0.96),rgba(13,148,136,0.62)_58%,rgba(236,254,255,0.08))]" />
+          <img
+            src="/brand/carebridge-favicon-future.png"
+            alt=""
+            className="absolute right-6 top-6 h-20 w-20 rounded-2xl bg-white/90 p-2 shadow-xl"
+            aria-hidden="true"
+          />
+          <div className="relative z-10 max-w-sm">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-white/15 text-2xl text-[#67E8F9]">
+              <FaHeartPulse />
             </div>
+            <h2 className="mt-6 text-3xl font-black leading-tight">
+              Patient care with less waiting and more clarity.
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-cyan-50/80">
+              From searching for a specialist to booking a slot, the experience
+              stays simple, organized, and ready for follow-up.
+            </p>
+          </div>
+          <div className="absolute bottom-6 left-6 right-6 z-10 grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+              <p className="text-2xl font-black">50+</p>
+              <p className="text-sm text-cyan-50/75">Specialists</p>
+            </div>
+            <div className="rounded-xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+              <p className="text-2xl font-black">30 min</p>
+              <p className="text-sm text-cyan-50/75">Smart slots</p>
+            </div>
+          </div>
         </div>
-    );
-}
+
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+            About Us
+          </p>
+          <h2 className="mt-3 text-3xl font-black leading-tight text-[#134E4A] sm:text-5xl">
+            A modern clinic experience from first search to final follow-up
+          </h2>
+          <p className="mt-5 text-base leading-8 text-slate-600">
+            Doctors Consultation helps patients find the right care team,
+            compare services, book appointments, and keep their details in one
+            place. The admin, doctor, and vendor areas are ready for Firebase
+            data so the site can grow without a traditional server.
+          </p>
+
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            {[
+              [<FaUserDoctor />, "Verified doctors", "Specialists grouped by department and location."],
+              [<FaCalendarCheck />, "Fast booking", "Guest and patient booking flows without duplicate popups."],
+            ].map(([icon, title, text]) => (
+              <div key={title} className="rounded-xl border border-[#67E8F9]/40 bg-white p-5 shadow-sm">
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-md bg-[#ECFEFF] text-xl text-[#0D9488]">
+                  {icon}
+                </div>
+                <h3 className="font-black text-[#134E4A]">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{text}</p>
+              </div>
+            ))}
+          </div>
+
+          <Link
+            to="/about"
+            className="mt-8 inline-flex items-center gap-2 rounded-md bg-[#0D9488] px-6 py-3 text-sm font-black text-white shadow-lg shadow-teal-900/10 transition hover:bg-[#0F766E]"
+          >
+            Learn More
+            <GoArrowDownRight className="h-5 w-5" />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 export default AboutUs;

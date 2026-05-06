@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="760" viewBox="0 0 900 760" fill="none">
+  <rect width="900" height="760" rx="44" fill="#e8faf6"/>
+  <circle cx="728" cy="146" r="82" fill="#ffd166"/>
+  <circle cx="145" cy="612" r="98" fill="#9ad5ff"/>
+  <rect x="178" y="130" width="544" height="484" rx="44" fill="#fff" stroke="#b9e9df" stroke-width="6"/>
+  <rect x="236" y="206" width="250" height="34" rx="17" fill="#dff7f1"/>
+  <rect x="236" y="270" width="384" height="20" rx="10" fill="#d8e2ea"/>
+  <rect x="236" y="314" width="322" height="20" rx="10" fill="#d8e2ea"/>
+  <rect x="236" y="384" width="166" height="130" rx="26" fill="#0f766e"/>
+  <rect x="432" y="384" width="166" height="130" rx="26" fill="#ff6b5f"/>
+  <path d="M318 414v70M283 449h70" stroke="#fff" stroke-width="16" stroke-linecap="round"/>
+  <path d="M501 416c25 0 45 20 45 45s-20 45-45 45-45-20-45-45 20-45 45-45Z" fill="#fff" opacity=".95"/>
+  <path d="M501 437v28l21 13" stroke="#ff6b5f" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M676 318c64 0 116 52 116 116s-52 116-116 116-116-52-116-116 52-116 116-116Z" fill="#17324d"/>
+  <path d="M676 380v108M622 434h108" stroke="#fff" stroke-width="22" stroke-linecap="round"/>
+  <path d="M120 236c44-46 114-52 165-16" stroke="#0f766e" stroke-width="18" stroke-linecap="round"/>
+  <path d="M108 285c58-70 157-78 226-23" stroke="#ff6b5f" stroke-width="12" stroke-linecap="round"/>
+</svg>

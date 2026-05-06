@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="72" viewBox="0 0 260 72" role="img" aria-labelledby="title desc">
+  <title id="title">CareBridge Clinic</title>
+  <desc id="desc">Modern healthcare appointment booking logo</desc>
+  <rect width="260" height="72" rx="16" fill="#ffffff"/>
+  <g transform="translate(14 12)">
+    <rect x="0" y="0" width="48" height="48" rx="14" fill="#0f766e"/>
+    <path d="M24 10c6 0 11 4.8 11 10.8 0 10.6-11 17.2-11 17.2s-11-6.6-11-17.2C13 14.8 18 10 24 10Z" fill="#ffffff" opacity=".96"/>
+    <path d="M24 16v16M16 24h16" stroke="#ff6b5f" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <text x="76" y="33" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="800" fill="#17324d">CareBridge</text>
+  <text x="77" y="52" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" letter-spacing=".9" fill="#0f766e">CLINIC APPOINTMENTS</text>
+</svg>

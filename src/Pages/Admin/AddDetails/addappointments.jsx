@@ -11,6 +11,10 @@ import VendorSearch from "../../../Component/Vendor/vendorsearch";
 import { format } from "date-fns";
 import LoaderH from "../../../Component/Loader/loader";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
+import {
+  getDoctorDisplayName,
+  isDoctorPanelFromCookies,
+} from "../../../utils/doctorPanelAccess";
 
 const AddAppointment = () => {
   const navigate = useNavigate();
@@ -33,22 +37,23 @@ const AddAppointment = () => {
   });
   const [formErrors, setFormErrors] = useState({});
   const [slots, setSlots] = useState({});
-  const [timeslots, setTimeslots] = useState([]);
+  const [, setTimeslots] = useState([]);
   const [selectedDate, setSelectedDate] = useState();
   const [selectedTime, setSelectedTime] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
   const [location, setLocation] = useState("");
   const [departments, setDepartments] = useState([]);
   const [doctor, setDoctor] = useState("");
   const [subSlots, setSubSlots] = useState([]);
-  const [currentMonth, setCurrentMonth] = useState(dayjs());
+  const [currentMonth] = useState(dayjs());
 
   useEffect(() => {
     getLocation();
     if (selectedDate) {
       getData(selectedDate);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
   useEffect(() => {
@@ -57,6 +62,7 @@ const AddAppointment = () => {
     } else {
       setDepartments([]);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.location]);
 
   const handleChange = (e) => {
@@ -76,8 +82,11 @@ const AddAppointment = () => {
   };
 
   const handleDoctorChange = (user) => {
+    const selectedUser = isDoctorPanelFromCookies()
+      ? Cookies.get("username")
+      : user;
     setSelectedDate(dayjs().format("YYYY-MM-DD"));
-    const doctorData = departments.find((doctor) => doctor.username === user);
+    const doctorData = departments.find((doctor) => doctor.username === selectedUser);
 
     if (doctorData) {
       setFormData((prev) => ({
@@ -86,8 +95,8 @@ const AddAppointment = () => {
         username: doctorData.username,
       }));
       setDoctor(doctorData.username);
+      getSlotData(doctorData.username);
     }
-    getSlotData(doctorData.username);
     setSelectedDate("");
     setSelectedTime("");
   };
@@ -175,7 +184,14 @@ const AddAppointment = () => {
         try {
           setLoading(true);
           window.scrollTo(0, 0);
-          await axios.post(`${BaseUrl}clinic/submit-appointment/`, formData, {
+          const payload = isDoctorPanelFromCookies()
+            ? {
+                ...formData,
+                username: Cookies.get("username"),
+                doctor_username: Cookies.get("username"),
+              }
+            : formData;
+          await axios.post(`${BaseUrl}clinic/submit-appointment/`, payload, {
             headers: { "Content-Type": "application/json" },
           });
           setLoading(false);
@@ -223,7 +239,26 @@ const AddAppointment = () => {
       const response = await axios.get(`${BaseUrl}clinic/staff-list/`, {
         headers: { Authorization: `Token ${token}` },
       });
-      setDepartments(response.data);
+      const currentUsername = Cookies.get("username");
+      const staffList = Array.isArray(response.data) ? response.data : [];
+      const scopedStaff = isDoctorPanelFromCookies()
+        ? staffList.filter((doctor) => doctor.username === currentUsername)
+        : staffList;
+      setDepartments(scopedStaff);
+
+      if (isDoctorPanelFromCookies() && scopedStaff.length > 0) {
+        const doctorData = scopedStaff[0];
+        setFormData((prev) => ({
+          ...prev,
+          location: doctorData.location || prev.location,
+          department: doctorData.department || prev.department,
+          doctor: `${doctorData.fname || ""} ${doctorData.lname || ""}`.trim(),
+          username: doctorData.username,
+          doctor_username: doctorData.username,
+        }));
+        setDoctor(doctorData.username);
+        getSlotData(doctorData.username);
+      }
     } catch (error) {
       setError(error.message);
     }
@@ -350,13 +385,16 @@ const AddAppointment = () => {
   function handleBreadClick(event) {
     event.preventDefault();
   }
+  const doctorOnly = isDoctorPanelFromCookies();
+  const doctorDisplayName = getDoctorDisplayName(departments, Cookies.get("username"));
+
   return (
     <>
       {loading ? (
         <LoaderH />
       ) : (
         <>
-          <div className="py-8 px-8 w-full md:w-[80%] xl:w-full">
+          <div className="legacy-panel-page py-8 px-8 w-full md:w-[80%] xl:w-full">
             {isSuperuser ? (
               <AdminSearch />
             ) : isVendor && !isStaff ? (
@@ -397,11 +435,11 @@ const AddAppointment = () => {
                 </Link>
               </Breadcrumbs>
             </div>
-            <div className="w-full bg-[#F2F2F2] px-4 py-8 mt-3">
+            <div className="legacy-panel-surface w-full px-4 py-8 mt-3">
               <div className="flex items-center justify-between">
-                <text className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
+                <span className="font-nunito-sans text-[32px] font-bold leading-[43.65px] text-[#202224]">
                   Add Appointment
-                </text>
+                </span>
               </div>
               <form id="AddAppointment" onSubmit={handleSubmit}>
                 <div className="space-y-12">
@@ -585,57 +623,70 @@ const AddAppointment = () => {
                       </div>
 
                       <div className="col-span-full sm:col-span-3">
-                        <label
-                          htmlFor="doctor"
-                          className="block text-sm font-medium leading-6 text-gray-900"
-                        >
-                          Doctor<span className="text-red-500">*</span>
-                        </label>
-                        <div className="mt-2">
-                          <select
-                            name="doctor"
-                            id="doctor"
-                            className="block w-full rounded-md border-0 pl-3 py-2 bg-white text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                            onChange={handleChange}
-                          >
-                            <option value="">Select a Doctor</option>
-                            {departments.length > 0 ? (
-                              Array.from(
-                                new Set(
-                                  departments
-                                    .filter(
-                                      (doctor) =>
-                                        doctor.department ===
-                                        formData.department
+                        {doctorOnly ? (
+                          <div className="rounded-2xl border border-[#67E8F9]/50 bg-[#ECFEFF] p-4">
+                            <p className="text-xs font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                              Assigned doctor
+                            </p>
+                            <p className="mt-2 text-lg font-black text-[#134E4A]">
+                              {doctorDisplayName}
+                            </p>
+                          </div>
+                        ) : (
+                          <>
+                            <label
+                              htmlFor="doctor"
+                              className="block text-sm font-medium leading-6 text-gray-900"
+                            >
+                              Doctor<span className="text-red-500">*</span>
+                            </label>
+                            <div className="mt-2">
+                              <select
+                                name="doctor"
+                                id="doctor"
+                                className="block w-full rounded-md border-0 pl-3 py-2 bg-white text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                                onChange={handleChange}
+                              >
+                                <option value="">Select a Doctor</option>
+                                {departments.length > 0 ? (
+                                  Array.from(
+                                    new Set(
+                                      departments
+                                        .filter(
+                                          (doctor) =>
+                                            doctor.department ===
+                                            formData.department
+                                        )
+                                        .map((doctor) => doctor.username)
                                     )
-                                    .map((doctor) => doctor.username) // Ensure `username` is used here
-                                )
-                              ).map((username) => {
-                                const doctorData = departments.find(
-                                  (doc) =>
-                                    doc.username === username &&
-                                    doc.location === formData.location &&
-                                    doc.department === formData.department
-                                );
-                                return doctorData ? (
-                                  <option
-                                    key={doctorData.id}
-                                    value={doctorData.username}
-                                  >
-                                    {doctorData.fname + " " + doctorData.lname}
+                                  ).map((username) => {
+                                    const doctorData = departments.find(
+                                      (doc) =>
+                                        doc.username === username &&
+                                        doc.location === formData.location &&
+                                        doc.department === formData.department
+                                    );
+                                    return doctorData ? (
+                                      <option
+                                        key={doctorData.id}
+                                        value={doctorData.username}
+                                      >
+                                        {doctorData.fname + " " + doctorData.lname}
+                                      </option>
+                                    ) : null;
+                                  })
+                                ) : (
+                                  <option disabled>
+                                    Select Location & Department First....
                                   </option>
-                                ) : null;
-                              })
-                            ) : (
-                              <option disabled>
-                                Select Location & Department First....
-                              </option>
-                            )}
-                          </select>
-                          {formErrors.doctor && (
-                            <p className="text-red-600">{formErrors.doctor}</p>
-                          )}
-                        </div>
+                                )}
+                              </select>
+                              {formErrors.doctor && (
+                                <p className="text-red-600">{formErrors.doctor}</p>
+                              )}
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       <div className="col-span-full sm:col-span-3">
