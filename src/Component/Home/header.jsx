@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AppointmentModal from "./appointmentmodal";
 import axios from "axios";
 import BaseUrl from "../../Api/baseurl";
@@ -15,12 +15,13 @@ import {
 import Swal from "sweetalert2";
 
 const navItems = [
-  { label: "Home", href: "/" },
-  { label: "About", href: "/about" },
-  { label: "Hospitals", href: "/hospitals" },
-  { label: "Services", href: "/services" },
-  { label: "Blog", href: "/blog" },
-  { label: "Doctors", href: "/ourdoctors" },
+  { label: "Home", href: "/", matches: ["/"] },
+  { label: "About", href: "/about", matches: ["/about"] },
+  { label: "Hospitals", href: "/hospitals", matches: ["/hospitals"] },
+  { label: "Services", href: "/services", matches: ["/services"] },
+  { label: "Blog", href: "/blog", matches: ["/blog", "/blogpage"] },
+  { label: "Doctors", href: "/ourdoctors", matches: ["/ourdoctors", "/profiledoctor"] },
+  { label: "Contact", href: "/contact", matches: ["/contact", "/contactus"] },
 ];
 
 const defaultLogo = "/brand/carebridge-logo-future.png";
@@ -34,6 +35,7 @@ const normalizeLogo = (src) => {
 
 const Header = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showMenu, setShowMenu] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -45,7 +47,7 @@ const Header = () => {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
 
-  const active = window.location.pathname;
+  const activePath = location.pathname || "/";
   const patientUsername = Cookies.get("patient_username");
   const logoSrc = normalizeLogo(data.new_logo);
 
@@ -170,6 +172,10 @@ const Header = () => {
     details.name && details.name !== "N/A"
       ? details.name.split(" ")[0]
       : "Patient";
+  const isActiveNavItem = (item) =>
+    item.matches.some((path) =>
+      path === "/" ? activePath === "/" : activePath === path || activePath.startsWith(`${path}/`)
+    );
 
   return (
     <header className="sticky top-0 z-50 border-b border-[#67E8F9]/40 bg-[#ECFEFF]/80 shadow-sm backdrop-blur-2xl">
@@ -204,19 +210,24 @@ const Header = () => {
         </Link>
 
         <nav className="hidden items-center rounded-full border border-[#67E8F9]/50 bg-white/75 p-1 shadow-sm lg:flex">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              to={item.href}
-              className={`rounded-full px-4 py-2 text-sm font-black transition ${
-                active === item.href
-                  ? "bg-[#0D9488] text-white shadow-sm"
-                  : "text-[#134E4A] hover:bg-[#ECFEFF] hover:text-[#0D9488]"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const isActive = isActiveNavItem(item);
+            return (
+              <Link
+                key={item.href}
+                to={item.href}
+                aria-current={isActive ? "page" : undefined}
+                data-active={isActive ? "true" : "false"}
+                className={`rounded-full px-3 py-2 text-sm font-black transition xl:px-4 ${
+                  isActive
+                    ? "active bg-[#0D9488] text-white shadow-sm shadow-teal-900/10"
+                    : "text-[#134E4A] hover:bg-[#ECFEFF] hover:text-[#0D9488]"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
@@ -419,20 +430,25 @@ const Header = () => {
       {showMenu && (
         <div className="border-t border-[#67E8F9]/30 bg-white px-5 py-4 shadow-xl lg:hidden">
           <nav className="flex flex-col gap-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                to={item.href}
-                onClick={() => setShowMenu(false)}
-                className={`rounded-xl px-3 py-3 text-sm font-black ${
-                  active === item.href
-                    ? "bg-[#0D9488] text-white"
-                    : "text-[#134E4A] hover:bg-[#ECFEFF]"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const isActive = isActiveNavItem(item);
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  onClick={() => setShowMenu(false)}
+                  aria-current={isActive ? "page" : undefined}
+                  data-active={isActive ? "true" : "false"}
+                  className={`rounded-xl px-3 py-3 text-sm font-black ${
+                    isActive
+                      ? "active bg-[#0D9488] text-white shadow-sm"
+                      : "text-[#134E4A] hover:bg-[#ECFEFF]"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
             <Link
               to={isLogin ? "/userprofile" : "/user/login"}
               onClick={() => setShowMenu(false)}

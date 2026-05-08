@@ -282,6 +282,244 @@ const docById = async (collectionName, id) => {
   }
 };
 
+const makeDocId = (...parts) =>
+  parts
+    .filter(Boolean)
+    .join("-")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || `doc-${Date.now()}`;
+
+const pageContentSeed = {
+  "privacy-policy": {
+    id: "privacy-policy",
+    title: "Privacy Policy",
+    slug: "privacy-policy",
+    content:
+      "<h2>Information We Collect</h2><p>CareBridge may collect appointment details, contact information, profile data, doctor selections, preferred time slots, and messages submitted through the platform.</p><h2>How We Use Information</h2><p>We use information to manage appointments, support communication, improve booking flows, and keep clinic visit details organized.</p>",
+  },
+  "terms-of-service": {
+    id: "terms-of-service",
+    title: "Terms of Service",
+    slug: "terms-of-service",
+    content:
+      "<h2>Using CareBridge</h2><p>CareBridge helps patients discover specialists, request appointments, and manage clinic visit details. Please provide accurate information and use the service for lawful healthcare appointment purposes.</p><h2>Appointments</h2><p>Availability depends on clinic and doctor schedules, and bookings may be confirmed, rescheduled, or cancelled if availability changes.</p>",
+  },
+};
+
+const getPageContent = async () => {
+  try {
+    const snap = await db.collection("pages").limit(100).get();
+    const pages = snap.docs.map(withId);
+    return pages.length ? pages : Object.values(pageContentSeed);
+  } catch (error) {
+    console.warn("Using seed page content:", error.message);
+    return Object.values(pageContentSeed);
+  }
+};
+
+const getPageBySlug = async (slug) => {
+  const id = String(slug || "").replace(/\/+$/, "");
+  try {
+    const snap = await db.collection("pages").doc(id).get();
+    return snap.exists ? withId(snap) : pageContentSeed[id] || null;
+  } catch (error) {
+    console.warn("Using seed page:", error.message);
+    return pageContentSeed[id] || null;
+  }
+};
+
+const statusPatch = async (collectionName, id, payload = {}) => {
+  const status =
+    payload.status !== undefined
+      ? payload.status
+      : payload.is_active !== undefined
+        ? payload.is_active
+        : payload.current_status
+          ? 0
+          : 1;
+  return updateDocument(collectionName, id, {
+    status,
+    is_active: status === 1 || status === true,
+  });
+};
+
+const defaultWeekSlots = (username = "default") => {
+  const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  return Object.fromEntries(
+    days.map((day, dayIndex) => [
+      day,
+      [
+        {
+          id: `${username}-${day}-morning`,
+          start: "10:00:00",
+          end: "11:00:00",
+          start_time: "10:00:00",
+          end_time: "11:00:00",
+          duration: 30,
+          is_active: true,
+          sortOrder: dayIndex * 2 + 1,
+        },
+        {
+          id: `${username}-${day}-afternoon`,
+          start: "15:00:00",
+          end: "16:00:00",
+          start_time: "15:00:00",
+          end_time: "16:00:00",
+          duration: 30,
+          is_active: true,
+          sortOrder: dayIndex * 2 + 2,
+        },
+      ],
+    ]),
+  );
+};
+
+const defaultSettingsFor = (username = "default") => ({
+  id: username,
+  username,
+  number_of_days: 30,
+  check_days: false,
+  until_date: null,
+  auto_generate: false,
+});
+
+const getDefaultSlots = async (username = "default") => {
+  const docId = String(username || "default").toLowerCase();
+  const snap = await db.collection("defaultSlots").doc(docId).get();
+  return snap.exists ? snap.data().slots || defaultWeekSlots(docId) : defaultWeekSlots(docId);
+};
+
+const slotDateFromId = (slotId = "") => {
+  const match = String(slotId).match(/\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : null;
+};
+
+const slotOverrideDocId = (username, slotId) => makeDocId(username || "global", slotId);
+
+const applySlotOverrides = async (baseSlots, username = "global") => {
+  const monthDates = Object.keys(baseSlots);
+  if (!monthDates.length) return baseSlots;
+  const start = monthDates[0];
+  const end = monthDates[monthDates.length - 1];
+  const slotSnaps = await Promise.all([
+    db.collection("dateSlots").where("username", "==", String(username || "global").toLowerCase()).limit(500).get(),
+    db.collection("dateSlots").where("username", "==", "global").limit(500).get(),
+  ]);
+  const subSlotSnaps = await Promise.all([
+    db.collection("dateSubSlots").where("username", "==", String(username || "global").toLowerCase()).limit(1000).get(),
+    db.collection("dateSubSlots").where("username", "==", "global").limit(1000).get(),
+  ]);
+
+  const slotOverrides = slotSnaps
+    .flatMap((snap) => snap.docs.map(withId))
+    .filter((item) => item.date >= start && item.date <= end);
+  const subSlotOverrides = subSlotSnaps
+    .flatMap((snap) => snap.docs.map(withId))
+    .filter((item) => item.date >= start && item.date <= end);
+
+  slotOverrides.forEach((override) => {
+    const date = override.date || slotDateFromId(override.slotId || override.id);
+    if (!date || !baseSlots[date]) return;
+    baseSlots[date].slots = baseSlots[date].slots
+      .map((slot) => {
+        if (slot.id !== override.slotId) return slot;
+        if (override.deleted) return null;
+        return {
+          ...slot,
+          ...override,
+          id: slot.id,
+          start_time: override.start_time || slot.start_time,
+          end_time: override.end_time || slot.end_time,
+          duration: override.duration || slot.duration,
+          is_active: override.is_active ?? slot.is_active,
+        };
+      })
+      .filter(Boolean);
+  });
+
+  subSlotOverrides.forEach((override) => {
+    const date = override.date || slotDateFromId(override.subSlotId || override.id);
+    if (!date || !baseSlots[date]) return;
+    baseSlots[date].slots = baseSlots[date].slots.map((slot) => ({
+      ...slot,
+      sub_slots: (slot.sub_slots || [])
+        .map((subSlot) => {
+          if (subSlot.id !== override.subSlotId) return subSlot;
+          if (override.deleted) return null;
+          return {
+            ...subSlot,
+            ...override,
+            id: subSlot.id,
+            is_active: override.is_active ?? subSlot.is_active,
+          };
+        })
+        .filter(Boolean),
+    }));
+  });
+
+  Object.values(baseSlots).forEach((day) => {
+    const allSubSlots = day.slots.flatMap((slot) => slot.sub_slots || []);
+    day.total_count = allSubSlots.length;
+    day.total_booked = allSubSlots.filter((slot) => slot.is_booked).length;
+    day.slots = day.slots.map((slot) => ({
+      ...slot,
+      booked_sub_slot_count: (slot.sub_slots || []).filter((subSlot) => subSlot.is_booked).length,
+    }));
+  });
+
+  return baseSlots;
+};
+
+const monthlySlotsForDoctor = async (username, year, month) =>
+  applySlotOverrides(buildMonthlySlots(year, month), username || "global");
+
+const ensureAuthUser = async ({email, password, username, profile = {}, claims = {}}) => {
+  if (!email) return null;
+  let user = null;
+  try {
+    user = await getAuth().getUserByEmail(email);
+    const updatePayload = {};
+    if (password) updatePayload.password = password;
+    if (username) updatePayload.displayName = username;
+    if (Object.keys(updatePayload).length) {
+      user = await getAuth().updateUser(user.uid, updatePayload);
+    }
+  } catch (error) {
+    user = await getAuth().createUser({
+      email,
+      password: password || `CareBridge${Date.now()}!`,
+      displayName: username || email,
+    });
+  }
+
+  await db.collection("users").doc(user.uid).set(
+    {
+      uid: user.uid,
+      email,
+      username: username || profile.username || email,
+      usernameLower: String(username || profile.username || email).toLowerCase(),
+      ...profile,
+      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+    },
+    {merge: true},
+  );
+  await db.collection("usernames").doc(String(username || email).toLowerCase()).set(
+    {
+      uid: user.uid,
+      username: username || email,
+      email,
+      roles: profile.roles || [],
+    },
+    {merge: true},
+  );
+  if (Object.keys(claims).length) {
+    await getAuth().setCustomUserClaims(user.uid, claims);
+  }
+  return user;
+};
+
 const addDocument = async (collectionName, payload) => {
   const ref = await db.collection(collectionName).add({
     ...payload,
@@ -707,7 +945,9 @@ app.get("/clinic/services-list/:id/", async (req, res) => {
 app.post("/clinic/submit-service/", requireAuth, async (req, res) => created(res, await addDocument("services", req.body)));
 app.put("/clinic/services-list/:id/", requireAuth, async (req, res) => ok(res, await updateDocument("services", req.params.id, req.body)));
 app.patch("/clinic/services-list/:id/", requireAuth, async (req, res) => ok(res, await updateDocument("services", req.params.id, req.body)));
+app.patch("/clinic/services-list/:id/toggle-status/", requireAuth, async (req, res) => ok(res, await statusPatch("services", req.params.id, req.body)));
 app.delete("/clinic/delete-service/:id/", requireAuth, async (req, res) => ok(res, await deleteDocument("services", req.params.id)));
+app.delete("/clinic/delete-services/:id/", requireAuth, async (req, res) => ok(res, await deleteDocument("services", req.params.id)));
 
 app.get("/clinic/blogs-list/", async (req, res) => ok(res, await collectionList("blogs", {limit: 200})));
 app.get("/clinic/blogs-list/:id/", async (req, res) => {
@@ -753,23 +993,90 @@ app.get("/clinic/staff-list/:id/", async (req, res) => {
 app.post("/clinic/submit-staff/", requireAuth, async (req, res) => created(res, await addDocument("staff", req.body)));
 app.put("/clinic/staff-list/:id/", requireAuth, async (req, res) => ok(res, await updateDocument("staff", req.params.id, req.body)));
 app.patch("/clinic/staff-list/:id/", requireAuth, async (req, res) => ok(res, await updateDocument("staff", req.params.id, req.body)));
+app.patch("/clinic/staff-list/:id/toggle-status/", requireAuth, async (req, res) => ok(res, await statusPatch("staff", req.params.id, req.body)));
 app.delete("/clinic/delete-staff/:id/", requireAuth, async (req, res) => ok(res, await deleteDocument("staff", req.params.id)));
+
+app.post("/clinic/register-staff/", requireAuth, async (req, res) => {
+  const username = req.body.username || req.body.email;
+  const user = await ensureAuthUser({
+    email: req.body.email,
+    password: req.body.password,
+    username,
+    profile: {
+      username,
+      roles: ["doctor", "staff"],
+      role: "doctor",
+      is_staff: true,
+      is_vendor: false,
+      is_superuser: false,
+      hospitalIds: [req.body.hospitalId || DEFAULT_HOSPITAL_ID],
+    },
+    claims: {
+      role: "doctor",
+      roles: ["doctor", "staff"],
+      hospitalIds: [req.body.hospitalId || DEFAULT_HOSPITAL_ID],
+    },
+  });
+  created(res, {success: true, uid: user?.uid, username});
+});
+
+app.patch("/clinic/toggle-user-status/", requireAuth, async (req, res) => {
+  const id = req.body.staff_id || req.body.patient_id || req.body.id || req.body.uid;
+  if (!id) return badRequest(res, "staff_id, patient_id, or id is required");
+  const active = req.body.current_status ? 0 : 1;
+  const updated = await updateDocument("staff", id, {
+    account_status: active,
+    user_status: active,
+    is_active: active === 1,
+  });
+  return ok(res, updated);
+});
 
 app.get("/clinic/managelocation/", async (req, res) => ok(res, await collectionList("locations", {limit: 200})));
 app.post("/clinic/managelocation/", requireAuth, async (req, res) => created(res, await addDocument("locations", req.body)));
 app.patch("/clinic/managelocation/:id/", requireAuth, async (req, res) => ok(res, await updateDocument("locations", req.params.id, req.body)));
+app.put("/clinic/managelocation/:id/", requireAuth, async (req, res) => ok(res, await updateDocument("locations", req.params.id, req.body)));
+app.patch("/clinic/managelocation/:id/toggle-status/", requireAuth, async (req, res) => ok(res, await statusPatch("locations", req.params.id, req.body)));
 app.delete("/clinic/delete-location/:id/", requireAuth, async (req, res) => ok(res, await deleteDocument("locations", req.params.id)));
 
 app.get("/clinic/managedepartment/", async (req, res) => ok(res, await collectionList("departments", {limit: 200})));
 app.post("/clinic/managedepartment/", requireAuth, async (req, res) => created(res, await addDocument("departments", req.body)));
 app.patch("/clinic/managedepartment/:id/", requireAuth, async (req, res) => ok(res, await updateDocument("departments", req.params.id, req.body)));
+app.put("/clinic/managedepartment/:id/", requireAuth, async (req, res) => ok(res, await updateDocument("departments", req.params.id, req.body)));
+app.patch("/clinic/managedepartment/:id/toggle-status/", requireAuth, async (req, res) => ok(res, await statusPatch("departments", req.params.id, req.body)));
 app.delete("/clinic/delete-department/:id/", requireAuth, async (req, res) => ok(res, await deleteDocument("departments", req.params.id)));
 
 app.get("/clinic/manageblogcategories/", async (req, res) => ok(res, await collectionList("blogCategories", {limit: 200})));
 app.post("/clinic/manageblogcategories/", requireAuth, async (req, res) => created(res, await addDocument("blogCategories", req.body)));
 app.put("/clinic/manageblogcategories/:id/", requireAuth, async (req, res) => ok(res, await updateDocument("blogCategories", req.params.id, req.body)));
 app.patch("/clinic/manageblogcategories/:id/", requireAuth, async (req, res) => ok(res, await updateDocument("blogCategories", req.params.id, req.body)));
+app.patch("/clinic/manageblogcategories/:id/toggle-status/", requireAuth, async (req, res) => ok(res, await statusPatch("blogCategories", req.params.id, req.body)));
 app.delete("/clinic/delete-blogcategory/:id/", requireAuth, async (req, res) => ok(res, await deleteDocument("blogCategories", req.params.id)));
+app.delete("/clinic/delete-blogcategories/:id/", requireAuth, async (req, res) => ok(res, await deleteDocument("blogCategories", req.params.id)));
+
+app.get("/clinic/managepages/", requireAuth, async (req, res) => ok(res, await getPageContent()));
+app.get("/clinic/managepages/:slug/", requireAuth, async (req, res) => {
+  const page = await getPageBySlug(req.params.slug);
+  return page ? ok(res, page) : notFound(res);
+});
+app.get("/clinic/managepages/:slug", requireAuth, async (req, res) => {
+  const page = await getPageBySlug(req.params.slug);
+  return page ? ok(res, page) : notFound(res);
+});
+app.put("/clinic/managepages/:slug/", requireAuth, async (req, res) => {
+  const slug = req.params.slug;
+  await db.collection("pages").doc(slug).set(
+    {
+      id: slug,
+      slug,
+      ...req.body,
+      updatedAt: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+    },
+    {merge: true},
+  );
+  ok(res, await getPageBySlug(slug));
+});
 
 app.get("/clinic/contact-form-list/", requireAuth, async (req, res) => ok(res, await collectionList("contacts", {limit: 500})));
 app.post("/clinic/submit-contact/", async (req, res) => created(res, await addDocument("contacts", req.body)));
@@ -778,6 +1085,50 @@ app.delete("/clinic/contact-form-list/:id/", requireAuth, async (req, res) => ok
 app.get("/clinic/consultation-query-list/", requireAuth, async (req, res) => ok(res, await collectionList("consultationQueries", {limit: 500})));
 app.post("/clinic/consultation-query/", async (req, res) => created(res, await addDocument("consultationQueries", req.body)));
 app.delete("/clinic/consultation-query/:id/", requireAuth, async (req, res) => ok(res, await deleteDocument("consultationQueries", req.params.id)));
+
+app.get("/clinic/setupnotifications/", requireAuth, async (req, res) => {
+  const snap = await db.collection("config").doc("notifications").get();
+  ok(res, snap.exists ? {id: snap.id, ...snap.data()} : {
+    whatsapp_number: "",
+    whatsapp_account_SID: "",
+    whatsapp_auth_token: "",
+    email: "",
+  });
+});
+
+app.put("/clinic/setupnotifications/", requireAuth, async (req, res) => {
+  await db.collection("config").doc("notifications").set(
+    {...req.body, updatedAt: FieldValue.serverTimestamp()},
+    {merge: true},
+  );
+  ok(res, {success: true, ...req.body});
+});
+
+app.get("/clinic/weekly-graphs/", requireAuth, async (req, res) => {
+  const appointments = await collectionList("appointments", {limit: 500, orderBy: null});
+  const labels = [];
+  const booked = [];
+  const available = [];
+  const cancelled = [];
+  for (let offset = 0; offset < 7; offset += 1) {
+    const date = new Date();
+    date.setDate(date.getDate() + offset);
+    const key = date.toISOString().slice(0, 10);
+    labels.push(date.toLocaleDateString("en", {weekday: "short"}));
+    const dayAppointments = appointments.filter((item) => item.date === key);
+    booked.push(dayAppointments.filter((item) => item.status !== "cancelled").length);
+    cancelled.push(dayAppointments.filter((item) => item.status === "cancelled").length);
+    available.push(Math.max(0, 12 - dayAppointments.length));
+  }
+  ok(res, {labels, booked, available, cancelled});
+});
+
+app.get("/clinic/graphs/", requireAuth, async (req, res) => {
+  const appointments = await collectionList("appointments", {limit: 500, orderBy: null});
+  const booked = appointments.filter((item) => item.status !== "cancelled").length;
+  const cancelled = appointments.filter((item) => item.status === "cancelled").length;
+  ok(res, {booked, cancelled, available: Math.max(0, 120 - booked)});
+});
 
 app.get(["/clinic/booking/", "/clinic/booking"], requireAuth, async (req, res) =>
   ok(res, await appointmentSummary(req.query.username)),
@@ -838,6 +1189,36 @@ app.get("/clinic/patient-profile/:username/", async (req, res) => {
   const patient = await db.collection("patients").doc(profile.uid).get();
   ok(res, patient.exists ? {id: patient.id, ...patient.data()} : profile);
 });
+
+app.get("/clinic/patient-list/", requireAuth, async (req, res) => {
+  const patients = await collectionList("patients", {limit: 500, orderBy: null});
+  ok(res, patients);
+});
+
+app.get("/clinic/patient-details/:id", requireAuth, async (req, res) => {
+  const patient = await docById("patients", req.params.id);
+  return patient ? ok(res, patient) : notFound(res);
+});
+
+app.get("/clinic/patient-list/:id/", requireAuth, async (req, res) => {
+  const patient = await docById("patients", req.params.id);
+  return patient ? ok(res, patient) : notFound(res);
+});
+
+app.put("/clinic/patient-list-update/:id/", requireAuth, async (req, res) =>
+  ok(res, await updateDocument("patients", req.params.id, req.body)),
+);
+
+app.patch("/clinic/patient-list/toggle-status/", requireAuth, async (req, res) => {
+  const id = req.body.patient_id || req.body.id;
+  if (!id) return badRequest(res, "patient_id is required");
+  return ok(res, await statusPatch("patients", id, req.body));
+});
+
+app.delete("/clinic/patient-list/:id/", requireAuth, async (req, res) =>
+  ok(res, await deleteDocument("patients", req.params.id)),
+);
+
 app.post("/clinic/register-patient/", async (req, res) => {
   const {email, password, username} = req.body;
   if (!email || !password || !username) return badRequest(res, "email, username, and password are required");
@@ -857,11 +1238,106 @@ app.post("/clinic/register-patient/", async (req, res) => {
   await db.collection("usernames").doc(String(username).toLowerCase()).set({uid: user.uid, email, username, roles: ["patient"]});
   created(res, {http_status_code: 201, uid: user.uid, username});
 });
+
+app.get("/clinic/vendor-profile/", requireAuth, async (req, res) => {
+  const vendors = await collectionList("vendors", {limit: 200, orderBy: null});
+  ok(res, {
+    status: vendors.some((vendor) => vendor.status === 1 || vendor.is_active !== false) ? 1 : 0,
+    vendor: vendors,
+    Uname: vendors.map((vendor) => vendor.username).filter(Boolean),
+  });
+});
+
+app.get("/clinic/vendor-profile/:username/", requireAuth, async (req, res) => {
+  const username = String(req.params.username || "").toLowerCase();
+  const vendors = await collectionList("vendors", {limit: 200, orderBy: null});
+  const vendor =
+    vendors.find((item) => String(item.username || "").toLowerCase() === username) ||
+    vendors.find((item) => String(item.id) === String(req.params.username));
+  return vendor ? ok(res, vendor) : notFound(res);
+});
+
+app.get("/clinic/vendor-profile/:username", requireAuth, async (req, res) => {
+  const username = String(req.params.username || "").toLowerCase();
+  const vendors = await collectionList("vendors", {limit: 200, orderBy: null});
+  const vendor =
+    vendors.find((item) => String(item.username || "").toLowerCase() === username) ||
+    vendors.find((item) => String(item.id) === String(req.params.username));
+  return vendor ? ok(res, vendor) : notFound(res);
+});
+
+app.get("/clinic/vendor-profile-view/:id/", requireAuth, async (req, res) => {
+  const vendor = await docById("vendors", req.params.id);
+  return vendor ? ok(res, vendor) : notFound(res);
+});
+
+app.put("/clinic/vendor-profile-view/:id/", requireAuth, async (req, res) =>
+  ok(res, await updateDocument("vendors", req.params.id, req.body)),
+);
+
+app.put("/clinic/vendor-profile/:username/", requireAuth, async (req, res) => {
+  const id = req.body.id || req.params.username;
+  ok(res, await updateDocument("vendors", id, req.body));
+});
+
+app.post("/clinic/register-vendor/", requireAuth, async (req, res) => {
+  const username = req.body.username || req.body.email;
+  const vendorId = makeDocId(username || req.body.first_name || req.body.fname || req.body.email);
+  const payload = {
+    id: vendorId,
+    ...req.body,
+    fname: req.body.fname || req.body.first_name,
+    lname: req.body.lname || req.body.last_name,
+    username,
+    status: 1,
+    is_active: true,
+    role: "manager",
+    hospitalIds: [req.body.hospitalId || DEFAULT_HOSPITAL_ID],
+    updatedAt: FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
+  };
+  await db.collection("vendors").doc(vendorId).set(payload, {merge: true});
+  const user = await ensureAuthUser({
+    email: req.body.email,
+    password: req.body.password,
+    username,
+    profile: {
+      username,
+      roles: ["vendor", "manager"],
+      role: "manager",
+      is_vendor: true,
+      is_staff: false,
+      is_superuser: false,
+      hospitalIds: payload.hospitalIds,
+    },
+    claims: {
+      role: "manager",
+      roles: ["vendor", "manager"],
+      hospitalIds: payload.hospitalIds,
+    },
+  });
+  created(res, {success: true, id: vendorId, uid: user?.uid, ...payload});
+});
+
+app.patch("/clinic/change-vendor-status/:id/", requireAuth, async (req, res) =>
+  ok(res, await statusPatch("vendors", req.params.id, req.body)),
+);
+
 app.get("/clinic/check-username/", async (req, res) => {
   const username = String(req.query.username || "").toLowerCase();
   if (!username) return badRequest(res, "username is required");
   const doc = await db.collection("usernames").doc(username).get();
   ok(res, {exists: doc.exists});
+});
+
+app.post("/clinic/changepassword/", requireAuth, async (req, res) => {
+  const username = req.body.username || req.body.email;
+  const newPassword = req.body.new_password || req.body.password;
+  if (!username || !newPassword) return badRequest(res, "username and new_password are required");
+  const mapping = await db.collection("usernames").doc(String(username).toLowerCase()).get();
+  if (!mapping.exists) return notFound(res, "User not found");
+  await getAuth().updateUser(mapping.data().uid, {password: newPassword});
+  ok(res, {success: true});
 });
 
 app.post("/clinic/setup-first-admin/", async (req, res) => {
@@ -933,18 +1409,160 @@ app.post("/clinic/seed-demo-data/", async (req, res) => {
 });
 
 app.get("/clinic/monthly/:year/:month/", async (req, res) => {
-  ok(res, buildMonthlySlots(req.params.year, req.params.month));
+  ok(res, await monthlySlotsForDoctor(req.query.username || "global", req.params.year, req.params.month));
 });
 
 app.get("/clinic/doctormonthlyslots/:username/:year/:month", async (req, res) => {
-  ok(res, buildMonthlySlots(req.params.year, req.params.month));
+  ok(res, await monthlySlotsForDoctor(req.params.username, req.params.year, req.params.month));
 });
 
 app.get("/clinic/slots/:username/:date", async (req, res) => {
   const [year, month] = String(req.params.date).split("-");
-  const monthlySlots = buildMonthlySlots(year, month);
+  const monthlySlots = await monthlySlotsForDoctor(req.params.username, year, month);
   const daySlots = monthlySlots[req.params.date];
   ok(res, daySlots ? [daySlots] : []);
+});
+
+app.get("/clinic/defaultslots/", requireAuth, async (req, res) => {
+  const username = req.query.username || req.user.name || req.user.email || "default";
+  ok(res, await getDefaultSlots(username));
+});
+
+app.put("/clinic/defaultslots/:day/", requireAuth, async (req, res) => {
+  const username = String(req.body?.[0]?.username || req.body?.username || req.query.username || "default").toLowerCase();
+  const day = String(req.params.day || "").toLowerCase();
+  const slots = Array.isArray(req.body) ? req.body : [];
+  const existing = await getDefaultSlots(username);
+  existing[day] = slots.map((slot, index) => ({
+    ...slot,
+    id: slot.id || `${username}-${day}-${index + 1}`,
+    start: slot.start || slot.start_time,
+    end: slot.end || slot.end_time,
+    start_time: slot.start_time || slot.start,
+    end_time: slot.end_time || slot.end,
+  }));
+  await db.collection("defaultSlots").doc(username).set(
+    {username, slots: existing, updatedAt: FieldValue.serverTimestamp()},
+    {merge: true},
+  );
+  ok(res, existing);
+});
+
+app.delete("/clinic/defaultslots/:id/", requireAuth, async (req, res) => {
+  const username = String(req.body?.username || req.query.username || "default").toLowerCase();
+  const idOrDay = String(req.params.id || "").toLowerCase();
+  const existing = await getDefaultSlots(username);
+  if (existing[idOrDay]) {
+    delete existing[idOrDay];
+  } else {
+    Object.keys(existing).forEach((day) => {
+      existing[day] = existing[day].filter((slot) => String(slot.id) !== String(req.params.id));
+    });
+  }
+  await db.collection("defaultSlots").doc(username).set(
+    {username, slots: existing, updatedAt: FieldValue.serverTimestamp()},
+    {merge: true},
+  );
+  ok(res, {success: true});
+});
+
+app.get("/clinic/defaultsettings/", requireAuth, async (req, res) => {
+  const username = String(req.query.username || "default").toLowerCase();
+  const snap = await db.collection("defaultSlotSettings").doc(username).get();
+  ok(res, [snap.exists ? {id: snap.id, ...snap.data()} : defaultSettingsFor(username)]);
+});
+
+app.put("/clinic/defaultsettings/", requireAuth, async (req, res) => {
+  const username = String(req.body.username || "default").toLowerCase();
+  const payload = {
+    ...defaultSettingsFor(username),
+    ...req.body,
+    username,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await db.collection("defaultSlotSettings").doc(username).set(payload, {merge: true});
+  ok(res, [payload]);
+});
+
+app.post("/clinic/generateslots/", requireAuth, async (req, res) => {
+  ok(res, {success: true, message: "Slot generation settings saved. Monthly slots use the latest default slot configuration."});
+});
+
+app.put("/clinic/dateslot/:slotId/", requireAuth, async (req, res) => {
+  const profile = await getActorProfile(req.user.uid);
+  const username = String(req.body.username || profile.username || "global").toLowerCase();
+  const slotId = req.params.slotId;
+  const payload = {
+    ...req.body,
+    username,
+    slotId,
+    date: slotDateFromId(slotId),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await db.collection("dateSlots").doc(slotOverrideDocId(username, slotId)).set(payload, {merge: true});
+  ok(res, {success: true, ...payload});
+});
+
+app.patch("/clinic/dateslot/:slotId/", requireAuth, async (req, res) => {
+  const profile = await getActorProfile(req.user.uid);
+  const username = String(req.body.username || profile.username || "global").toLowerCase();
+  const slotId = req.params.slotId;
+  const payload = {
+    ...req.body,
+    username,
+    slotId,
+    date: slotDateFromId(slotId),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await db.collection("dateSlots").doc(slotOverrideDocId(username, slotId)).set(payload, {merge: true});
+  ok(res, {success: true, ...payload});
+});
+
+app.delete("/clinic/dateslot/:slotId/", requireAuth, async (req, res) => {
+  const profile = await getActorProfile(req.user.uid);
+  const username = String(req.body.username || profile.username || "global").toLowerCase();
+  const slotId = req.params.slotId;
+  const payload = {
+    username,
+    slotId,
+    date: slotDateFromId(slotId),
+    deleted: true,
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await db.collection("dateSlots").doc(slotOverrideDocId(username, slotId)).set(payload, {merge: true});
+  ok(res, {success: true});
+});
+
+app.patch("/clinic/datesubslot/:subSlotId/", requireAuth, async (req, res) => {
+  const profile = await getActorProfile(req.user.uid);
+  const username = String(req.body.username || profile.username || "global").toLowerCase();
+  const subSlotId = req.params.subSlotId;
+  const payload = {
+    ...req.body,
+    username,
+    subSlotId,
+    date: slotDateFromId(subSlotId),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  await db.collection("dateSubSlots").doc(slotOverrideDocId(username, subSlotId)).set(payload, {merge: true});
+  ok(res, {success: true, ...payload});
+});
+
+app.delete("/clinic/datesubslot/:subSlotId/", requireAuth, async (req, res) => {
+  const profile = await getActorProfile(req.user.uid);
+  const username = String(req.body.username || profile.username || "global").toLowerCase();
+  const subSlotId = req.params.subSlotId;
+  await db.collection("dateSubSlots").doc(slotOverrideDocId(username, subSlotId)).set(
+    {
+      username,
+      subSlotId,
+      date: slotDateFromId(subSlotId),
+      deleted: true,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    {merge: true},
+  );
+  ok(res, {success: true});
 });
 
 app.get(["/clinic/manageholiday/", "/clinic/manageholiday"], async (req, res) =>

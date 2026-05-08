@@ -12,7 +12,7 @@ import {
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
-import { auth, db, isFirebaseConfigured } from "./firebaseClient";
+import { auth, db, isFirebaseAuthEnabled, isFirebaseConfigured } from "./firebaseClient";
 
 const normalizeUsername = (username) => String(username || "").trim().toLowerCase();
 const DEMO_PASSWORD = "Demo123!";
@@ -47,11 +47,23 @@ const demoProfiles = [
   },
   {
     uid: "demo-doctor",
-    username: "doctor",
-    usernameLower: "doctor",
+    username: "nisha.rao",
+    usernameLower: "nisha.rao",
+    aliases: ["doctor"],
     email: "doctor@example.com",
     roles: ["doctor", "staff"],
     subroles: defaultDoctorSubRoles,
+    is_staff: true,
+    is_vendor: false,
+    is_superuser: false,
+  },
+  {
+    uid: "demo-staff",
+    username: "staff.reception",
+    usernameLower: "staff.reception",
+    aliases: ["staff"],
+    email: "staff@example.com",
+    roles: ["staff"],
     is_staff: true,
     is_vendor: false,
     is_superuser: false,
@@ -94,7 +106,8 @@ const findDemoProfile = (usernameOrEmail) => {
   return allDemoProfiles().find(
     (profile) =>
       profile.usernameLower === value ||
-      normalizeUsername(profile.email) === value,
+      normalizeUsername(profile.email) === value ||
+      (Array.isArray(profile.aliases) && profile.aliases.map(normalizeUsername).includes(value)),
   );
 };
 
@@ -105,7 +118,7 @@ const makeDemoUser = (profile) => ({
 });
 
 const requireFirebaseConfig = () => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !isFirebaseAuthEnabled) {
     throw new Error(
       "Firebase is not configured. Add your Firebase web app values to .env."
     );
@@ -113,7 +126,7 @@ const requireFirebaseConfig = () => {
 };
 
 export const usernameExists = async (username) => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !isFirebaseAuthEnabled) {
     return Boolean(findDemoProfile(username));
   }
   requireFirebaseConfig();
@@ -122,7 +135,7 @@ export const usernameExists = async (username) => {
 };
 
 export const getEmailForUsername = async (usernameOrEmail) => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !isFirebaseAuthEnabled) {
     const value = String(usernameOrEmail || "").trim();
     if (value.includes("@")) return value;
     const profile = findDemoProfile(value);
@@ -143,7 +156,7 @@ export const getEmailForUsername = async (usernameOrEmail) => {
 };
 
 export const getCurrentUserProfile = async (uid = auth.currentUser?.uid) => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !isFirebaseAuthEnabled) {
     return allDemoProfiles().find((profile) => profile.uid === uid) || null;
   }
   requireFirebaseConfig();
@@ -153,7 +166,7 @@ export const getCurrentUserProfile = async (uid = auth.currentUser?.uid) => {
 };
 
 export const registerPatient = async ({ username, email, password }) => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !isFirebaseAuthEnabled) {
     const normalizedUsername = normalizeUsername(username);
     const alreadyExists = await usernameExists(normalizedUsername);
     if (alreadyExists) {
@@ -224,7 +237,7 @@ export const registerPatient = async ({ username, email, password }) => {
 };
 
 export const loginWithUsernameOrEmail = async (usernameOrEmail, password) => {
-  if (!isFirebaseConfigured) {
+  if (!isFirebaseConfigured || !isFirebaseAuthEnabled) {
     const profile = findDemoProfile(usernameOrEmail);
     const expectedPassword = profile?.password || DEMO_PASSWORD;
 
@@ -242,11 +255,32 @@ export const loginWithUsernameOrEmail = async (usernameOrEmail, password) => {
   }
 
   requireFirebaseConfig();
-  const email = await getEmailForUsername(usernameOrEmail);
-  const credential = await signInWithEmailAndPassword(auth, email, password);
-  const profile = await getCurrentUserProfile(credential.user.uid);
-  const token = await getIdToken(credential.user);
-  return { user: credential.user, profile, token };
+  try {
+    const email = await getEmailForUsername(usernameOrEmail);
+    const credential = await signInWithEmailAndPassword(auth, email, password);
+    const profile = await getCurrentUserProfile(credential.user.uid);
+    const token = await getIdToken(credential.user);
+    return { user: credential.user, profile, token };
+  } catch (error) {
+    const authSetupMissing = [
+      "auth/configuration-not-found",
+      "auth/operation-not-allowed",
+      "CONFIGURATION_NOT_FOUND",
+      "OPERATION_NOT_ALLOWED",
+    ].some((code) => String(error.code || error.message || "").includes(code));
+
+    if (!authSetupMissing) throw error;
+
+    const profile = findDemoProfile(usernameOrEmail);
+    const expectedPassword = profile?.password || DEMO_PASSWORD;
+    if (!profile || password !== expectedPassword) throw error;
+
+    return {
+      user: makeDemoUser(profile),
+      profile,
+      token: `demo-token-${profile.uid}`,
+    };
+  }
 };
 
 export const logoutFirebaseUser = async () => {

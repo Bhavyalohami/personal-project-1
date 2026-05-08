@@ -1,4 +1,18 @@
 import axios from "axios";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit as firestoreLimit,
+  query,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { db, firebaseConfig, isFirebaseConfigured, storage } from "../firebase/firebaseClient";
 
 const siteConfig = {
   id: "site",
@@ -177,6 +191,50 @@ const staff = [
     achievements:
       "<p>Runs community health camps and preventive screening clinics.</p>",
   },
+  {
+    id: "doctor-sana-khan",
+    fname: "Sana",
+    lname: "Khan",
+    name: "Dr. Sana Khan",
+    username: "sana.khan",
+    email: "sana.khan@doctorsconsultation.example",
+    role: "Doctor",
+    designation: "Radiology Consultant",
+    department: "Radiology",
+    location: "New Delhi",
+    yoe: 10,
+    amount: 60,
+    status: 1,
+    average_rating: 4.7,
+    rating: 4.7,
+    image: "/brand/doctor-avatar-female-teal.png",
+    introduction:
+      "Dr. Sana Khan specializes in diagnostic imaging, ultrasound review, preventive scans, and patient-friendly report explanations.",
+    achievements:
+      "<p>Advanced fellowship in body imaging with extensive experience in outpatient diagnostic workflows.</p>",
+  },
+  {
+    id: "doctor-kabir-malhotra",
+    fname: "Kabir",
+    lname: "Malhotra",
+    name: "Dr. Kabir Malhotra",
+    username: "kabir.malhotra",
+    email: "kabir.malhotra@doctorsconsultation.example",
+    role: "Doctor",
+    designation: "Endocrinology Specialist",
+    department: "Endocrinology",
+    location: "New Delhi",
+    yoe: 13,
+    amount: 68,
+    status: 1,
+    average_rating: 4.8,
+    rating: 4.8,
+    image: "/brand/doctor-avatar-teal.png",
+    introduction:
+      "Dr. Kabir Malhotra supports diabetes, thyroid care, metabolic health, and long-term hormonal treatment planning.",
+    achievements:
+      "<p>Runs structured diabetes reversal and thyroid follow-up programs for chronic care patients.</p>",
+  },
 ];
 
 const services = [
@@ -326,6 +384,42 @@ const holidays = [
     date: "2026-05-15",
     comment: "Doctor unavailable",
     status: 1,
+  },
+];
+
+const defaultSlotDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+const defaultSlotSeed = defaultSlotDays.flatMap((day) => [
+  {
+    id: `${day}-morning`,
+    day,
+    start: "10:00:00",
+    end: "11:00:00",
+    start_time: "10:00:00",
+    end_time: "11:00:00",
+    duration: 30,
+    username: "amelia.shah",
+  },
+  {
+    id: `${day}-afternoon`,
+    day,
+    start: "15:00:00",
+    end: "16:00:00",
+    start_time: "15:00:00",
+    end_time: "16:00:00",
+    duration: 30,
+    username: "amelia.shah",
+  },
+]);
+
+const defaultSlotSettingsSeed = [
+  {
+    id: "amelia.shah",
+    username: "amelia.shah",
+    number_of_days: 14,
+    check_days: false,
+    until_date: null,
+    auto_generate: true,
   },
 ];
 
@@ -646,6 +740,11 @@ const parseUrl = (config) => {
   if (typeof window === "undefined") return null;
   try {
     const url = new URL(config.url || "", window.location.origin);
+    if (config.params && typeof config.params === "object") {
+      Object.entries(config.params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) url.searchParams.set(key, value);
+      });
+    }
     const pathname = (url.pathname.replace(/^\/api(?=\/|$)/, "").replace(/\/+$/, "") || "/");
     return { url, pathname };
   } catch (error) {
@@ -656,12 +755,807 @@ const parseUrl = (config) => {
 const shouldUseStaticApi = (config, pathname, url) => {
   if (!pathname || (!pathname.startsWith("/clinic") && !pathname.startsWith("/hms"))) return false;
   const href = String(config.url || "");
-  return (
-    href.includes("cloudfunctions.net/api") ||
-    href.includes("127.0.0.1:5050") ||
-    href.includes("localhost:5050") ||
-    url.origin === window.location.origin
+  const headers = config.headers || {};
+  const authorization = String(headers.Authorization || headers.authorization || "");
+  const forceStatic = process.env.REACT_APP_USE_STATIC_API_FALLBACK === "true";
+  const disableStatic = process.env.REACT_APP_DISABLE_STATIC_API_FALLBACK === "true";
+  const hasDemoToken = authorization.includes("demo-token");
+  const isLocalMockUrl = href.includes("127.0.0.1:5050") || href.includes("localhost:5050");
+  const isCloudFunctionsUrl = href.includes("cloudfunctions.net/api");
+
+  if (forceStatic || hasDemoToken) return true;
+  if (isCloudFunctionsUrl) return false;
+  if (disableStatic) return false;
+  return isLocalMockUrl;
+};
+
+const isFileLike = (value) =>
+  typeof File !== "undefined" &&
+  value instanceof File &&
+  value.name &&
+  value.size !== undefined;
+
+const safeFileName = (name) =>
+  String(name || "upload")
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const uploadLegacyFile = async (file) => {
+  if (!isFirebaseConfigured || !storage) {
+    return file.name || "";
+  }
+  try {
+    const path = `legacy-uploads/${Date.now()}-${safeFileName(file.name)}`;
+    const uploadRef = ref(storage, path);
+    await uploadBytes(uploadRef, file, {
+      contentType: file.type || "application/octet-stream",
+    });
+    return getDownloadURL(uploadRef);
+  } catch (error) {
+    return file.name || "";
+  }
+};
+
+const normalizeRequestData = async (config) => {
+  if (typeof FormData === "undefined" || !(config.data instanceof FormData)) {
+    return config;
+  }
+
+  const parsed = parseUrl(config);
+  if (!parsed || (!parsed.pathname.startsWith("/clinic") && !parsed.pathname.startsWith("/hms"))) {
+    return config;
+  }
+
+  const payload = {};
+  for (const [key, value] of config.data.entries()) {
+    payload[key] = isFileLike(value) ? await uploadLegacyFile(value) : value;
+  }
+
+  return {
+    ...config,
+    data: payload,
+    headers: {
+      ...(config.headers || {}),
+      "Content-Type": "application/json",
+    },
+  };
+};
+
+const firestoreTimestampToJson = (value) => {
+  if (value?.toDate) return value.toDate().toISOString();
+  if (Array.isArray(value)) return value.map(firestoreTimestampToJson);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entryValue]) => [key, firestoreTimestampToJson(entryValue)]),
+    );
+  }
+  return value;
+};
+
+const firestoreItem = (docSnap) => ({
+  id: docSnap.id,
+  ...firestoreTimestampToJson(docSnap.data()),
+});
+
+const readFirestoreList = async (collectionName, seed = [], max = 500) => {
+  try {
+    const snap = await getDocs(query(collection(db, collectionName), firestoreLimit(max)));
+    const items = snap.docs.map(firestoreItem);
+    return normalizeAssetPaths(items.length ? items : clone(seed));
+  } catch (error) {
+    return normalizeAssetPaths(clone(seed));
+  }
+};
+
+const readFirestoreDoc = async (collectionName, id, seed = []) => {
+  try {
+    const snap = await getDoc(doc(db, collectionName, String(id)));
+    if (snap.exists()) return normalizeAssetPaths(firestoreItem(snap));
+  } catch (error) {
+    return normalizeAssetPaths(findById(seed, id) || null);
+  }
+  return normalizeAssetPaths(findById(seed, id) || null);
+};
+
+const readFirestoreNestedList = async (segments, seed = [], max = 500) => {
+  try {
+    const snap = await getDocs(query(collection(db, ...segments), firestoreLimit(max)));
+    const items = snap.docs.map(firestoreItem);
+    return normalizeAssetPaths(items.length ? items : clone(seed));
+  } catch (error) {
+    return normalizeAssetPaths(clone(seed));
+  }
+};
+
+const readFirestoreNestedDoc = async (segments, id, seed = []) => {
+  try {
+    const snap = await getDoc(doc(db, ...segments, String(id)));
+    if (snap.exists()) return normalizeAssetPaths(firestoreItem(snap));
+  } catch (error) {
+    return normalizeAssetPaths(findById(seed, id) || null);
+  }
+  return normalizeAssetPaths(findById(seed, id) || null);
+};
+
+const docIdFromPayload = (payload, fallback = "") =>
+  String(payload.id || payload.username || payload.slug || payload.name || fallback || `doc-${Date.now()}`)
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const addFirestoreDoc = async (collectionName, payload, preferredId = "") => {
+  const data = {
+    ...payload,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  if (preferredId) {
+    const refDoc = doc(db, collectionName, String(preferredId));
+    await setDoc(refDoc, { id: preferredId, ...data }, { merge: true });
+    const saved = await getDoc(refDoc);
+    return firestoreItem(saved);
+  }
+  const refDoc = await addDoc(collection(db, collectionName), data);
+  const saved = await getDoc(refDoc);
+  return firestoreItem(saved);
+};
+
+const addFirestoreNestedDoc = async (segments, payload, preferredId = "") => {
+  const data = {
+    ...payload,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+  if (preferredId) {
+    const refDoc = doc(db, ...segments, String(preferredId));
+    await setDoc(refDoc, { id: preferredId, ...data }, { merge: true });
+    const saved = await getDoc(refDoc);
+    return firestoreItem(saved);
+  }
+  const refDoc = await addDoc(collection(db, ...segments), data);
+  await setDoc(refDoc, { id: refDoc.id, updatedAt: serverTimestamp() }, { merge: true });
+  const saved = await getDoc(refDoc);
+  return firestoreItem(saved);
+};
+
+const updateFirestoreDoc = async (collectionName, id, payload) => {
+  const refDoc = doc(db, collectionName, String(id));
+  await setDoc(
+    refDoc,
+    {
+      ...payload,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
   );
+  const saved = await getDoc(refDoc);
+  return firestoreItem(saved);
+};
+
+const updateFirestoreNestedDoc = async (segments, id, payload) => {
+  const refDoc = doc(db, ...segments, String(id));
+  await setDoc(
+    refDoc,
+    {
+      ...payload,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+  const saved = await getDoc(refDoc);
+  return firestoreItem(saved);
+};
+
+const deleteFirestoreDoc = async (collectionName, id) => {
+  await deleteDoc(doc(db, collectionName, String(id)));
+  return { success: true };
+};
+
+const statusValue = (payload = {}) =>
+  payload.status !== undefined
+    ? payload.status
+    : payload.is_active !== undefined
+      ? payload.is_active
+      : payload.current_status
+        ? 0
+        : 1;
+
+const updateFirestoreStatus = async (collectionName, id, payload = {}) => {
+  const status = statusValue(payload);
+  return updateFirestoreDoc(collectionName, id, {
+    status,
+    is_active: status === 1 || status === true,
+  });
+};
+
+const identityToolkitSignUp = async ({ email, password }) => {
+  if (!email || !password || !firebaseConfig.apiKey) return null;
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
+    },
+  );
+  const data = await response.json();
+  if (data.error?.message === "EMAIL_EXISTS") {
+    const login = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, returnSecureToken: true }),
+      },
+    );
+    const loginData = await login.json();
+    if (loginData.localId) return loginData;
+  }
+  if (!response.ok || data.error) {
+    throw new Error(data.error?.message || "Unable to create Firebase Auth user");
+  }
+  return data;
+};
+
+const createRoleUser = async ({ payload, role, roles, isStaff = false, isVendor = false, isSuperuser = false }) => {
+  const username = payload.username || payload.email;
+  const authUser = await identityToolkitSignUp({
+    email: payload.email,
+    password: payload.password,
+  });
+  const uid = authUser?.localId || payload.uid || docIdFromPayload(payload, username);
+  const profile = {
+    uid,
+    username,
+    usernameLower: String(username || "").toLowerCase(),
+    email: payload.email,
+    role,
+    roles,
+    is_staff: isStaff,
+    is_vendor: isVendor,
+    is_superuser: isSuperuser,
+    hospitalIds: payload.hospitalIds || [payload.hospitalId || "default-hospital"],
+  };
+  await setDoc(doc(db, "users", uid), { ...profile, updatedAt: serverTimestamp(), createdAt: serverTimestamp() }, { merge: true });
+  await setDoc(doc(db, "usernames", profile.usernameLower), { uid, username, email: payload.email, roles }, { merge: true });
+  return { uid, ...profile };
+};
+
+const activeFirestoreItems = (items) =>
+  items.filter((item) => item.status === 1 || item.status === "active" || item.is_active === true);
+
+const slotsGroupedByDay = (items) =>
+  defaultSlotDays.reduce((groups, day) => {
+    groups[day] = items
+      .filter((slot) => String(slot.day || "").toLowerCase() === day)
+      .map((slot) => ({
+        ...slot,
+        start: slot.start || slot.start_time,
+        end: slot.end || slot.end_time,
+      }));
+    return groups;
+  }, {});
+
+const authUidFromConfig = (config) => {
+  const authorization = String(config.headers?.Authorization || config.headers?.authorization || "");
+  const token = authorization.replace(/^Bearer\s+/i, "").replace(/^Token\s+/i, "");
+  if (!token || token.includes("demo-token") || !token.includes(".")) return "";
+  try {
+    const payload = JSON.parse(window.atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload.user_id || payload.sub || "";
+  } catch (error) {
+    return "";
+  }
+};
+
+const firestoreSearchStaff = async (searchQuery) => {
+  const doctors = activeFirestoreItems(await readFirestoreList("staff", staff));
+  const q = String(searchQuery || "").toLowerCase().trim();
+  if (!q) return doctors.slice(0, 8);
+  return doctors
+    .filter((doctor) =>
+      [doctor.fname, doctor.lname, doctor.name, doctor.department, doctor.location, doctor.designation, doctor.username]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q),
+    )
+    .slice(0, 10);
+};
+
+const firestoreAppointmentSummary = async () => {
+  const appointmentItems = await readFirestoreList("appointments", appointments);
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    appointments: appointmentItems,
+    todays_appointments: appointmentItems.filter((item) => item.date === today).slice(0, 10),
+    cancelled_appointments: appointmentItems.filter((item) => item.status === "cancelled"),
+    total_appointments: appointmentItems.length,
+    total_patients: (await readFirestoreList("patients", patients)).length,
+    total_doctors: activeFirestoreItems(await readFirestoreList("staff", staff)).length,
+    staff: await readFirestoreList("staff", staff),
+    departments: await readFirestoreList("departments", departments),
+    locations: await readFirestoreList("locations", locations),
+    services: await readFirestoreList("services", services),
+  };
+};
+
+const resolveFirestoreGet = async (pathname, url) => {
+  if (!isFirebaseConfigured || !db) return null;
+
+  if (["/clinic/configurations", "/clinic/slogan", "/clinic/logochange", "/clinic/faviconchange", "/clinic/timings", "/clinic/address", "/clinic/socialmediaprofiles", "/clinic/socialmediaprofile", "/clinic/currency"].includes(pathname)) {
+    const config = await readFirestoreDoc("config", "site", [siteConfig]);
+    return staticResponse(config || siteConfig);
+  }
+  if (pathname === "/clinic/latest-services") return staticResponse(activeFirestoreItems(await readFirestoreList("services", services)).slice(0, 6));
+  if (pathname === "/clinic/services-list") return staticResponse(await readFirestoreList("services", services));
+  if (pathname.startsWith("/clinic/services-list/")) return staticResponse(await readFirestoreDoc("services", pathname.split("/").pop(), services) || {});
+  if (pathname === "/clinic/blogs-list") return staticResponse(await readFirestoreList("blogs", blogs));
+  if (pathname.startsWith("/clinic/blogs-list/")) return staticResponse(await readFirestoreDoc("blogs", pathname.split("/").pop(), blogs) || {});
+  if (pathname === "/clinic/manageblogcategories") return staticResponse(await readFirestoreList("blogCategories", blogCategories));
+  if (["/clinic/staff-list", "/clinic/allstaff"].includes(pathname)) return staticResponse(await readFirestoreList("staff", staff));
+  if (pathname === "/clinic/doctorlist") return staticResponse(activeFirestoreItems(await readFirestoreList("staff", staff)));
+  if (pathname === "/clinic/home-search-staff") return staticResponse(await firestoreSearchStaff(url.searchParams.get("q")));
+  if (pathname.startsWith("/clinic/staff-list/")) return staticResponse(await readFirestoreDoc("staff", pathname.split("/").pop(), staff) || {});
+  if (pathname === "/clinic/managelocation") return staticResponse(await readFirestoreList("locations", locations));
+  if (pathname === "/clinic/managedepartment") return staticResponse(await readFirestoreList("departments", departments));
+  if (pathname === "/clinic/feedback-list") return staticResponse(await readFirestoreList("feedback", feedback));
+  if (pathname === "/clinic/patient-list") return staticResponse(await readFirestoreList("patients", patients));
+  if (pathname.startsWith("/clinic/patient-list/") || pathname.startsWith("/clinic/patient-details/")) {
+    return staticResponse(await readFirestoreDoc("patients", pathname.split("/").pop(), patients) || {});
+  }
+  if (pathname.startsWith("/clinic/patient-profile/")) {
+    const username = pathname.split("/").pop();
+    const list = await readFirestoreList("patients", patients);
+    return staticResponse(list.find((item) => item.username === username || item.id === username) || patientForUsername(username));
+  }
+  if (pathname === "/clinic/booking") return staticResponse(await firestoreAppointmentSummary());
+  if (pathname === "/clinic/bookings-list") return staticResponse(await readFirestoreList("appointments", appointments));
+  if (pathname.startsWith("/clinic/bookings-list/")) return staticResponse(await readFirestoreDoc("appointments", pathname.split("/").pop(), appointments) || {});
+  if (pathname.startsWith("/clinic/booking/")) {
+    const username = pathname.split("/").pop();
+    const list = await readFirestoreList("appointments", appointments);
+    return staticResponse(list.filter((item) => item.doctor_username === username || item.username === username));
+  }
+  if (pathname.startsWith("/clinic/dashboard/")) {
+    const username = pathname.split("/").pop();
+    const appointmentList = await readFirestoreList("appointments", appointments);
+    const documentList = await readFirestoreList("patientDocuments", []);
+    return staticResponse({
+      data: {
+        upcoming_bookings: appointmentList.filter((item) => item.username === username || item.patientUsername === username),
+        documents: documentList.filter((item) => item.username === username || item.patientUsername === username),
+        notifications,
+      },
+    });
+  }
+  if (pathname === "/clinic/documents") return staticResponse(await readFirestoreList("patientDocuments", []));
+  if (pathname === "/clinic/contact-form-list") return staticResponse(await readFirestoreList("contacts", []));
+  if (pathname === "/clinic/consultation-query-list" || pathname === "/clinic/consultation-query") return staticResponse(await readFirestoreList("consultationQueries", []));
+  if (pathname === "/clinic/setupnotifications") return staticResponse(await readFirestoreDoc("config", "notifications", []) || {});
+  if (pathname === "/clinic/managepages") {
+    const pages = await readFirestoreList("pages", Object.values(pageContent));
+    return staticResponse(pages);
+  }
+  if (pathname.startsWith("/clinic/managepages/")) {
+    return staticResponse(await readFirestoreDoc("pages", pathname.split("/").pop(), Object.values(pageContent)) || {});
+  }
+  if (pathname === "/clinic/vendor-profile") {
+    const vendors = await readFirestoreList("vendors", []);
+    return staticResponse({ status: vendors.some((item) => item.status === 1) ? 1 : 0, vendor: vendors, Uname: vendors.map((item) => item.username).filter(Boolean) });
+  }
+  if (pathname.startsWith("/clinic/vendor-profile-view/") || pathname.startsWith("/clinic/vendor-profile/")) {
+    const id = pathname.split("/").pop();
+    const vendors = await readFirestoreList("vendors", []);
+    return staticResponse(vendors.find((item) => item.id === id || item.username === id) || {});
+  }
+  if (pathname === "/clinic/weekly-graphs") return resolveGet(pathname, url);
+  if (pathname === "/clinic/graphs") return resolveGet(pathname, url);
+  if (pathname.startsWith("/clinic/monthly/") || pathname.startsWith("/clinic/doctormonthlyslots/") || pathname.startsWith("/clinic/slots/")) return resolveGet(pathname, url);
+  if (pathname === "/clinic/defaultslots") {
+    const username = url.searchParams.get("username");
+    const list = await readFirestoreList("defaultSlots", defaultSlotSeed);
+    const filtered = username ? list.filter((slot) => slot.username === username || slot.username === "amelia.shah") : list;
+    return staticResponse(slotsGroupedByDay(filtered));
+  }
+  if (pathname === "/clinic/defaultsettings") {
+    const username = url.searchParams.get("username");
+    const settings = await readFirestoreList("defaultSlotSettings", defaultSlotSettingsSeed);
+    return staticResponse(username ? settings.filter((item) => item.username === username || item.id === username) : settings);
+  }
+  if (pathname === "/clinic/manageholiday") {
+    const username = url.searchParams.get("username");
+    const list = await readFirestoreList("holidays", holidays);
+    return staticResponse(username ? list.filter((item) => item.username === username) : list);
+  }
+  if (pathname.startsWith("/clinic/manageholiday/")) {
+    const username = pathname.split("/").pop();
+    const list = await readFirestoreList("holidays", holidays);
+    return staticResponse(list.filter((item) => item.username === username));
+  }
+  if (pathname === "/hms/hospitals" || pathname === "/hms/discovery/hospitals") {
+    const hospitalsList = await readFirestoreList("hospitals", hospitals);
+    const city = String(url.searchParams.get("city") || "").toLowerCase();
+    return staticResponse(hospitalsList.filter((hospital) => (city ? String(hospital.location?.city || "").toLowerCase() === city : true)));
+  }
+  if (/^\/hms\/hospitals\/[^/]+\/profile$/.test(pathname)) {
+    const hospitalId = pathname.split("/")[3];
+    const hospital = await readFirestoreDoc("hospitals", hospitalId, hospitals);
+    if (!hospital) return staticResponse(hospitalProfile(hospitalId));
+    const defaultTests = tests.filter((test) => (hospitalTestIds[hospitalId] || []).includes(test.id));
+    return staticResponse({
+      hospital,
+      media: await readFirestoreNestedList(["hospitals", hospitalId, "media"], hospitalProfile(hospitalId).media || []),
+      services: await readFirestoreNestedList(["hospitals", hospitalId, "services"], await readFirestoreList("services", services)),
+      doctors: await readFirestoreNestedList(["hospitals", hospitalId, "doctors"], activeFirestoreItems(await readFirestoreList("staff", staff))),
+      tests: await readFirestoreNestedList(["hospitals", hospitalId, "tests"], defaultTests),
+    });
+  }
+  if (/^\/hms\/hospitals\/[^/]+\/tests$/.test(pathname)) {
+    const hospitalId = pathname.split("/")[3];
+    return staticResponse(await readFirestoreNestedList(
+      ["hospitals", hospitalId, "tests"],
+      tests.filter((test) => (hospitalTestIds[hospitalId] || []).includes(test.id)),
+    ));
+  }
+  if (/^\/hms\/hospitals\/[^/]+\/test-slots$/.test(pathname)) {
+    const hospitalId = pathname.split("/")[3];
+    const testId = url.searchParams.get("testId");
+    const list = await readFirestoreNestedList(
+      ["hospitals", hospitalId, "testSlots"],
+      testSlots.filter((slot) => slot.hospitalId === hospitalId),
+    );
+    return staticResponse(list.filter((slot) => !testId || slot.testId === testId));
+  }
+  if (/^\/hms\/hospitals\/[^/]+\/test-bookings$/.test(pathname)) {
+    const hospitalId = pathname.split("/")[3];
+    const list = await readFirestoreList("testBookings", []);
+    return staticResponse(list.filter((booking) => booking.hospitalId === hospitalId));
+  }
+  if (/^\/hms\/hospitals\/[^/]+\/inventory$/.test(pathname)) {
+    const hospitalId = pathname.split("/")[3];
+    return staticResponse(await readFirestoreNestedList(["hospitals", hospitalId, "inventory"], inventory));
+  }
+  if (/^\/hms\/hospitals\/[^/]+\/notifications$/.test(pathname)) {
+    const hospitalId = pathname.split("/")[3];
+    return staticResponse(await readFirestoreNestedList(["hospitals", hospitalId, "notifications"], notifications));
+  }
+  if (/^\/hms\/hospitals\/[^/]+\/audit-logs$/.test(pathname)) {
+    const hospitalId = pathname.split("/")[3];
+    return staticResponse(await readFirestoreNestedList(["hospitals", hospitalId, "auditLogs"], auditLogs));
+  }
+  if (/^\/hms\/hospitals\/[^/]+\/chats$/.test(pathname)) {
+    const hospitalId = pathname.split("/")[3];
+    return staticResponse(await readFirestoreNestedList(["hospitals", hospitalId, "chats"], []));
+  }
+
+  return null;
+};
+
+const resolveFirestoreWrite = async (pathname, config) => {
+  if (!isFirebaseConfigured || !db) return null;
+  const method = String(config.method || "").toUpperCase();
+  let payload = {};
+  try {
+    payload = typeof config.data === "string" ? JSON.parse(config.data || "{}") : config.data || {};
+  } catch (error) {
+    payload = {};
+  }
+
+  const createRoutes = [
+    ["/clinic/submit-service", "services"],
+    ["/clinic/submit-blog", "blogs"],
+    ["/clinic/submit-staff", "staff"],
+    ["/clinic/managelocation", "locations"],
+    ["/clinic/managedepartment", "departments"],
+    ["/clinic/manageblogcategories", "blogCategories"],
+    ["/clinic/submit-contact", "contacts"],
+    ["/clinic/consultation-query", "consultationQueries"],
+    ["/clinic/feedback", "feedback"],
+  ];
+  const createRoute = createRoutes.find(([route]) => pathname === route);
+  if (createRoute) return staticResponse(await addFirestoreDoc(createRoute[1], payload), 201);
+
+  if (["/clinic/booking", "/clinic/submit-appointment"].includes(pathname)) {
+    return staticResponse(await addFirestoreDoc("appointments", { status: "confirmed", ...payload }), 201);
+  }
+
+  if (pathname === "/clinic/register-patient") {
+    const user = await createRoleUser({ payload, role: "patient", roles: ["patient"] });
+    await setDoc(doc(db, "patients", user.uid), { ...payload, ...user, updatedAt: serverTimestamp(), createdAt: serverTimestamp() }, { merge: true });
+    return staticResponse({ http_status_code: 201, ...user }, 201);
+  }
+  if (pathname === "/clinic/register-staff") {
+    const user = await createRoleUser({ payload, role: "doctor", roles: ["doctor", "staff"], isStaff: true });
+    return staticResponse({ success: true, ...user }, 201);
+  }
+  if (pathname === "/clinic/register-vendor") {
+    const user = await createRoleUser({ payload, role: "manager", roles: ["vendor", "manager"], isVendor: true });
+    const vendorId = docIdFromPayload(payload, user.username);
+    await setDoc(doc(db, "vendors", vendorId), { id: vendorId, ...payload, ...user, status: 1, is_active: true, updatedAt: serverTimestamp(), createdAt: serverTimestamp() }, { merge: true });
+    return staticResponse({ success: true, id: vendorId, ...user }, 201);
+  }
+
+  const updatePatterns = [
+    [/^\/clinic\/services-list\/([^/]+)(?:\/toggle-status)?$/, "services"],
+    [/^\/clinic\/blogs-list\/([^/]+)$/, "blogs"],
+    [/^\/clinic\/staff-list\/([^/]+)(?:\/toggle-status)?$/, "staff"],
+    [/^\/clinic\/managelocation\/([^/]+)(?:\/toggle-status)?$/, "locations"],
+    [/^\/clinic\/managedepartment\/([^/]+)(?:\/toggle-status)?$/, "departments"],
+    [/^\/clinic\/manageblogcategories\/([^/]+)(?:\/toggle-status)?$/, "blogCategories"],
+    [/^\/clinic\/bookings-list\/([^/]+)$/, "appointments"],
+    [/^\/clinic\/feedback\/([^/]+)(?:\/status)?$/, "feedback"],
+    [/^\/clinic\/patient-list-update\/([^/]+)$/, "patients"],
+    [/^\/clinic\/vendor-profile-view\/([^/]+)$/, "vendors"],
+    [/^\/clinic\/vendor-profile\/([^/]+)$/, "vendors"],
+  ];
+  for (const [pattern, collectionName] of updatePatterns) {
+    const match = pathname.match(pattern);
+    if (match) {
+      const isToggle = pathname.includes("toggle-status") || pathname.endsWith("/status");
+      return staticResponse(
+        isToggle
+          ? await updateFirestoreStatus(collectionName, match[1], payload)
+          : await updateFirestoreDoc(collectionName, match[1], payload),
+      );
+    }
+  }
+
+  if (pathname === "/clinic/patient-list/toggle-status") {
+    return staticResponse(await updateFirestoreStatus("patients", payload.patient_id || payload.id, payload));
+  }
+  if (pathname === "/clinic/toggle-user-status") {
+    return staticResponse(await updateFirestoreStatus("staff", payload.staff_id || payload.id, { status: payload.current_status ? 0 : 1 }));
+  }
+  if (pathname.startsWith("/clinic/change-vendor-status/")) {
+    return staticResponse(await updateFirestoreStatus("vendors", pathname.split("/").pop(), payload));
+  }
+  if (["/clinic/configurations", "/clinic/slogan", "/clinic/logochange", "/clinic/faviconchange", "/clinic/timings", "/clinic/address", "/clinic/socialmediaprofiles", "/clinic/socialmediaprofile", "/clinic/currency"].includes(pathname)) {
+    return staticResponse(await updateFirestoreDoc("config", "site", payload));
+  }
+  if (pathname === "/clinic/setupnotifications") {
+    return staticResponse(await updateFirestoreDoc("config", "notifications", payload));
+  }
+  if (pathname.startsWith("/clinic/managepages/")) {
+    const slug = pathname.split("/").pop();
+    return staticResponse(await updateFirestoreDoc("pages", slug, { id: slug, slug, ...payload }));
+  }
+  if (pathname.startsWith("/clinic/cancel-booking/")) {
+    return staticResponse(await updateFirestoreDoc("appointments", pathname.split("/").pop(), { status: "cancelled", cancelledAt: new Date().toISOString() }));
+  }
+  if (pathname === "/clinic/defaultsettings") {
+    const id = docIdFromPayload(payload, payload.username || "default");
+    return staticResponse(await updateFirestoreDoc("defaultSlotSettings", id, { id, ...payload }));
+  }
+  if (pathname === "/clinic/generateslots") {
+    return staticResponse({ success: true, generated: true });
+  }
+  if (/^\/clinic\/defaultslots\/[^/]+$/.test(pathname)) {
+    const slotKey = pathname.split("/").pop();
+    if (method === "DELETE") {
+      const ids = Array.isArray(payload.ids) ? payload.ids : [slotKey];
+      await Promise.all(ids.map((id) => deleteFirestoreDoc("defaultSlots", id)));
+      return staticResponse({ success: true });
+    }
+    const day = slotKey.toLowerCase();
+    const slots = Array.isArray(payload) ? payload : [payload];
+    const saved = await Promise.all(
+      slots.map((slot, index) => {
+        const id = slot.id || `${day}-${index + 1}`;
+        return updateFirestoreDoc("defaultSlots", id, {
+          id,
+          day,
+          ...slot,
+          start: slot.start || slot.start_time,
+          end: slot.end || slot.end_time,
+        });
+      }),
+    );
+    return staticResponse(saved);
+  }
+  if (pathname === "/clinic/manageholiday") {
+    if (method === "DELETE") {
+      const dates = Array.isArray(payload.dates) ? payload.dates : [];
+      const username = payload.username;
+      const list = await readFirestoreList("holidays", holidays);
+      await Promise.all(
+        list
+          .filter((item) => (!username || item.username === username) && dates.includes(item.date))
+          .map((item) => deleteFirestoreDoc("holidays", item.id)),
+      );
+      return staticResponse({ success: true });
+    }
+    const dates = Array.isArray(payload.dates) ? payload.dates : [payload.date].filter(Boolean);
+    const saved = await Promise.all(
+      dates.map((date) =>
+        updateFirestoreDoc("holidays", `${payload.username || "doctor"}-${date}`, {
+          id: `${payload.username || "doctor"}-${date}`,
+          username: payload.username,
+          date,
+          comment: payload.comments || payload.comment || "",
+          status: 1,
+        }),
+      ),
+    );
+    return staticResponse(saved, method === "POST" ? 201 : 200);
+  }
+  if (/^\/clinic\/dateslots\/[^/]+$/.test(pathname)) {
+    const date = pathname.split("/").pop();
+    const id = payload.id || `${payload.username || "doctor"}-${date}-${Date.now()}`;
+    return staticResponse(await updateFirestoreDoc("dateSlots", id, { id, date, ...payload }), method === "POST" ? 201 : 200);
+  }
+  if (/^\/clinic\/dateslot\/[^/]+$/.test(pathname)) {
+    const slotId = pathname.split("/").pop();
+    return method === "DELETE"
+      ? staticResponse(await deleteFirestoreDoc("dateSlots", slotId))
+      : staticResponse(await updateFirestoreDoc("dateSlots", slotId, payload));
+  }
+  if (/^\/clinic\/datesubslot\/[^/]+$/.test(pathname)) {
+    const slotId = pathname.split("/").pop();
+    return method === "DELETE"
+      ? staticResponse(await deleteFirestoreDoc("dateSubSlots", slotId))
+      : staticResponse(await updateFirestoreDoc("dateSubSlots", slotId, payload));
+  }
+
+  if (pathname === "/hms/hospitals") {
+    const id = docIdFromPayload(payload, payload.hospitalId || payload.name);
+    return staticResponse(await updateFirestoreDoc("hospitals", id, { id, hospitalId: id, public: true, status: "active", ...payload }), 201);
+  }
+  const hmsProfileMatch = pathname.match(/^\/hms\/hospitals\/([^/]+)\/profile$/);
+  if (hmsProfileMatch) {
+    const hospitalId = hmsProfileMatch[1];
+    return staticResponse(await updateFirestoreDoc("hospitals", hospitalId, { id: hospitalId, hospitalId, ...payload }));
+  }
+  const hmsNestedCreate = pathname.match(/^\/hms\/hospitals\/([^/]+)\/(members|media|tests|test-slots|inventory|notifications|audit-logs)$/);
+  if (hmsNestedCreate) {
+    const [, hospitalId, moduleName] = hmsNestedCreate;
+    const collectionName = {
+      members: "members",
+      media: "media",
+      tests: "tests",
+      "test-slots": "testSlots",
+      inventory: "inventory",
+      notifications: "notifications",
+      "audit-logs": "auditLogs",
+    }[moduleName];
+    const preferredId = docIdFromPayload(payload, payload.uid || payload.testId || payload.medicineName || "");
+    return staticResponse(
+      await addFirestoreNestedDoc(
+        ["hospitals", hospitalId, collectionName],
+        {
+          hospitalId,
+          public: moduleName !== "inventory" && moduleName !== "audit-logs",
+          status: moduleName === "test-slots" ? "open" : "active",
+          ...payload,
+          availableCapacity: moduleName === "test-slots" ? Number(payload.capacity || 1) : payload.availableCapacity,
+        },
+        preferredId,
+      ),
+      201,
+    );
+  }
+  const hmsTestBookingMatch = pathname.match(/^\/hms\/hospitals\/([^/]+)\/test-bookings$/);
+  if (hmsTestBookingMatch) {
+    const hospitalId = hmsTestBookingMatch[1];
+    const patientUid = payload.patientUid || payload.userId || authUidFromConfig(config);
+    const slot = payload.slotId
+      ? await readFirestoreNestedDoc(["hospitals", hospitalId, "testSlots"], payload.slotId, testSlots)
+      : null;
+    if (slot?.id) {
+      const booked = Number(slot.booked || 0) + 1;
+      const capacity = Number(slot.capacity || 0);
+      await updateFirestoreNestedDoc(["hospitals", hospitalId, "testSlots"], slot.id, {
+        booked,
+        availableCapacity: Math.max(0, capacity - booked),
+      });
+    }
+    const test = payload.testId
+      ? await readFirestoreNestedDoc(["hospitals", hospitalId, "tests"], payload.testId, tests)
+      : null;
+    return staticResponse(
+      await addFirestoreDoc("testBookings", {
+        hospitalId,
+        patientUid,
+        userId: patientUid,
+        status: "booked",
+        testName: test?.name,
+        date: slot?.date,
+        startTime: slot?.startTime,
+        ...payload,
+      }),
+      201,
+    );
+  }
+  const stockMatch = pathname.match(/^\/hms\/hospitals\/([^/]+)\/inventory\/([^/]+)\/adjust-stock$/);
+  if (stockMatch) {
+    const [, hospitalId, medicineId] = stockMatch;
+    const item = await readFirestoreNestedDoc(["hospitals", hospitalId, "inventory"], medicineId, inventory);
+    const quantity = Number(payload.quantity || payload.delta || 0);
+    const nextStock = Number(item?.stock || 0) + quantity;
+    const saved = await updateFirestoreNestedDoc(["hospitals", hospitalId, "inventory"], medicineId, { stock: nextStock });
+    await addFirestoreNestedDoc(["hospitals", hospitalId, "inventory", medicineId, "stockLogs"], {
+      hospitalId,
+      medicineId,
+      quantity,
+      type: payload.type || (quantity >= 0 ? "purchase" : "dispense"),
+    });
+    return staticResponse(saved);
+  }
+  const invoiceMatch = pathname.match(/^\/hms\/hospitals\/([^/]+)\/invoices$/);
+  if (invoiceMatch) {
+    const hospitalId = invoiceMatch[1];
+    return staticResponse(await addFirestoreNestedDoc(["hospitals", hospitalId, "billing"], { hospitalId, status: "issued", ...payload }), 201);
+  }
+  const chatRequestMatch = pathname.match(/^\/hms\/hospitals\/([^/]+)\/chats\/request$/);
+  if (chatRequestMatch) {
+    const hospitalId = chatRequestMatch[1];
+    const patientUid = payload.patientUid || authUidFromConfig(config);
+    const chat = await addFirestoreNestedDoc(["hospitals", hospitalId, "chats"], {
+      hospitalId,
+      patientUid,
+      status: "requested",
+      lastMessage: payload.message || "Chat request sent.",
+      lastMessageAt: serverTimestamp(),
+      ...payload,
+    });
+    await addFirestoreNestedDoc(["hospitals", hospitalId, "chats", chat.id, "messages"], {
+      chatId: chat.id,
+      senderUid: patientUid,
+      text: payload.message || "Hello doctor, I would like to chat about my care.",
+      type: "text",
+    });
+    return staticResponse(chat, 201);
+  }
+  const chatStatusMatch = pathname.match(/^\/hms\/hospitals\/([^/]+)\/chats\/([^/]+)\/(accept|close)$/);
+  if (chatStatusMatch) {
+    const [, hospitalId, chatId, action] = chatStatusMatch;
+    return staticResponse(await updateFirestoreNestedDoc(["hospitals", hospitalId, "chats"], chatId, { status: action === "close" ? "closed" : "open" }));
+  }
+  const chatMessageMatch = pathname.match(/^\/hms\/hospitals\/([^/]+)\/chats\/([^/]+)\/messages$/);
+  if (chatMessageMatch) {
+    const [, hospitalId, chatId] = chatMessageMatch;
+    const senderUid = payload.senderUid || authUidFromConfig(config);
+    await updateFirestoreNestedDoc(["hospitals", hospitalId, "chats"], chatId, {
+      lastMessage: payload.text || "",
+      lastMessageAt: serverTimestamp(),
+    });
+    return staticResponse(await addFirestoreNestedDoc(["hospitals", hospitalId, "chats", chatId, "messages"], { chatId, senderUid, type: "text", ...payload }), 201);
+  }
+
+  const deletePatterns = [
+    [/^\/clinic\/delete-services?\/([^/]+)$/, "services"],
+    [/^\/clinic\/delete-blog\/([^/]+)$/, "blogs"],
+    [/^\/clinic\/delete-blogcategor(?:y|ies)\/([^/]+)$/, "blogCategories"],
+    [/^\/clinic\/delete-staff\/([^/]+)$/, "staff"],
+    [/^\/clinic\/delete-location\/([^/]+)$/, "locations"],
+    [/^\/clinic\/delete-department\/([^/]+)$/, "departments"],
+    [/^\/clinic\/delete-booking\/([^/]+)$/, "appointments"],
+    [/^\/clinic\/patient-list\/([^/]+)$/, "patients"],
+    [/^\/clinic\/contact-form-list\/([^/]+)$/, "contacts"],
+    [/^\/clinic\/consultation-query\/([^/]+)$/, "consultationQueries"],
+  ];
+  if (method === "DELETE") {
+    for (const [pattern, collectionName] of deletePatterns) {
+      const match = pathname.match(pattern);
+      if (match) return staticResponse(await deleteFirestoreDoc(collectionName, match[1]));
+    }
+  }
+
+  return null;
+};
+
+const resolveFirestoreApiResponse = async (config) => {
+  const parsed = parseUrl(config);
+  if (!parsed || (!parsed.pathname.startsWith("/clinic") && !parsed.pathname.startsWith("/hms"))) return null;
+  const href = String(config.url || "");
+  const isLocalApiTarget = href.includes("127.0.0.1:5050") || href.includes("localhost:5050");
+  const isRealFirebaseTarget = href.includes("cloudfunctions.net/api") || parsed.url.origin === window.location.origin || isLocalApiTarget;
+  if (!isRealFirebaseTarget) return null;
+
+  const method = String(config.method || "get").toUpperCase();
+  if (method === "GET") return resolveFirestoreGet(parsed.pathname, parsed.url);
+  return resolveFirestoreWrite(parsed.pathname, config);
 };
 
 const resolveGet = (pathname, url) => {
@@ -826,19 +1720,21 @@ export const installStaticApiFallback = () => {
   if (axios.__carebridgeStaticApiInstalled) return;
   axios.__carebridgeStaticApiInstalled = true;
 
-  axios.interceptors.request.use((config) => {
-    const response = resolveStaticApiResponse(config);
-    if (!response) return config;
+  axios.interceptors.request.use(async (config) => {
+    const normalizedConfig = await normalizeRequestData(config);
+    const firestoreResponse = await resolveFirestoreApiResponse(normalizedConfig);
+    const response = firestoreResponse || resolveStaticApiResponse(normalizedConfig);
+    if (!response) return normalizedConfig;
 
     return {
-      ...config,
+      ...normalizedConfig,
       adapter: async (adapterConfig) => ({
         data: response.data,
         status: response.status,
         statusText: response.status === 201 ? "Created" : "OK",
         headers: { "content-type": "application/json" },
         config: adapterConfig,
-        request: { staticApiFallback: true },
+        request: { firebaseApiAdapter: Boolean(firestoreResponse), staticApiFallback: !firestoreResponse },
       }),
     };
   });

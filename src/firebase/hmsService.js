@@ -29,7 +29,7 @@ const authHeaders = () => {
 
 const isDemoMode = () => {
   const token = Cookies.get("token") || Cookies.get("patient_token");
-  return !isFirebaseConfigured || !token || String(token).startsWith("demo-token");
+  return !isFirebaseConfigured || !token;
 };
 
 const readDemoChats = () => {
@@ -150,6 +150,7 @@ export const requestChatWithDoctor = async ({
   }
 
   return request("post", `/hms/hospitals/${hospitalId}/chats/request`, {
+    patientUid: actor.uid,
     doctorUid,
     doctorId,
     doctorUsername,
@@ -230,7 +231,10 @@ export const sendChatMessage = async (hospitalId, chatId, text) => {
     return message;
   }
 
-  return request("post", `/hms/hospitals/${hospitalId}/chats/${chatId}/messages`, { text });
+  return request("post", `/hms/hospitals/${hospitalId}/chats/${chatId}/messages`, {
+    text,
+    senderUid: actor.uid,
+  });
 };
 
 export const subscribeToChatMessages = (hospitalId, chatId, callback) => {

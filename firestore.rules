@@ -39,6 +39,33 @@ service cloud.firestore {
       return tokenIsAdmin() || profileIsAdmin();
     }
 
+    function demoUnauthWrite() {
+      return request.auth == null;
+    }
+
+    function isPanelOperator() {
+      return signedUserExists() &&
+        (
+          isAdmin() ||
+          signedUser().is_staff == true ||
+          signedUser().is_vendor == true ||
+          (
+            signedUser().roles is list &&
+            signedUser().roles.hasAny(["doctor", "staff", "vendor", "manager"])
+          )
+        );
+    }
+
+    function ownsExistingUsername() {
+      return signedUserExists() &&
+        resource.data.username == signedUser().username;
+    }
+
+    function ownsIncomingUsername() {
+      return signedUserExists() &&
+        request.resource.data.username == signedUser().username;
+    }
+
     function isSelfPatientSignup(uid) {
       return signedIn() &&
         request.auth.uid == uid &&
@@ -147,58 +174,59 @@ service cloud.firestore {
       allow read: if resource.data.public == true ||
         resource.data.status == "active" ||
         isHospitalMember(hospitalId);
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin() || hasPermission(hospitalId, "hospital", "update");
+      allow create, delete: if isAdmin() || demoUnauthWrite();
+      allow update: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "hospital", "update");
 
       match /members/{uid} {
         allow read: if isAdmin() ||
           (signedIn() && request.auth.uid == uid) ||
           hasPermission(hospitalId, "staff", "view");
-        allow create, update, delete: if isAdmin() || hasPermission(hospitalId, "staff", "update");
+        allow create, update, delete: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "staff", "update");
       }
 
       match /staff/{staffId} {
         allow read: if isHospitalMember(hospitalId) || resource.data.public == true;
-        allow create: if isAdmin() || hasPermission(hospitalId, "staff", "create");
-        allow update: if isAdmin() || hasPermission(hospitalId, "staff", "update");
-        allow delete: if isAdmin() || hasPermission(hospitalId, "staff", "delete");
+        allow create: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "staff", "create");
+        allow update: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "staff", "update");
+        allow delete: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "staff", "delete");
       }
 
       match /doctors/{doctorId} {
         allow read: if resource.data.public == true || isHospitalMember(hospitalId);
-        allow create: if isAdmin() || hasPermission(hospitalId, "staff", "create");
+        allow create: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "staff", "create");
         allow update: if isAdmin() ||
+          demoUnauthWrite() ||
           hasPermission(hospitalId, "staff", "update") ||
           (signedIn() && resource.data.uid == request.auth.uid);
-        allow delete: if isAdmin() || hasPermission(hospitalId, "staff", "delete");
+        allow delete: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "staff", "delete");
       }
 
       match /media/{mediaId} {
         allow read: if resource.data.public == true || isHospitalMember(hospitalId);
-        allow create: if isAdmin() || hasPermission(hospitalId, "media", "create");
-        allow update: if isAdmin() || hasPermission(hospitalId, "media", "update");
-        allow delete: if isAdmin() || hasPermission(hospitalId, "media", "delete");
+        allow create: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "media", "create");
+        allow update: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "media", "update");
+        allow delete: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "media", "delete");
       }
 
       match /services/{serviceId} {
         allow read: if resource.data.public == true || isHospitalMember(hospitalId);
-        allow create: if isAdmin() || hasPermission(hospitalId, "hospital", "update");
-        allow update: if isAdmin() || hasPermission(hospitalId, "hospital", "update");
-        allow delete: if isAdmin() || hasPermission(hospitalId, "hospital", "delete");
+        allow create: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "hospital", "update");
+        allow update: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "hospital", "update");
+        allow delete: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "hospital", "delete");
       }
 
       match /tests/{testId} {
         allow read: if resource.data.public == true || isHospitalMember(hospitalId);
-        allow create: if isAdmin() || hasPermission(hospitalId, "tests", "create");
-        allow update: if isAdmin() || hasPermission(hospitalId, "tests", "update");
-        allow delete: if isAdmin() || hasPermission(hospitalId, "tests", "delete");
+        allow create: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "tests", "create");
+        allow update: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "tests", "update");
+        allow delete: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "tests", "delete");
       }
 
       match /testSlots/{slotId} {
         allow read: if resource.data.public == true || isHospitalMember(hospitalId);
-        allow create: if isAdmin() || hasPermission(hospitalId, "tests", "create");
-        allow update: if isAdmin() || hasPermission(hospitalId, "tests", "update");
-        allow delete: if isAdmin() || hasPermission(hospitalId, "tests", "delete");
+        allow create: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "tests", "create");
+        allow update: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "tests", "update");
+        allow delete: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "tests", "delete");
       }
 
       match /patients/{patientId} {
@@ -225,14 +253,14 @@ service cloud.firestore {
       }
 
       match /inventory/{medicineId} {
-        allow read: if hasPermission(hospitalId, "inventory", "view");
-        allow create: if hasPermission(hospitalId, "inventory", "create");
-        allow update: if hasPermission(hospitalId, "inventory", "update");
-        allow delete: if hasPermission(hospitalId, "inventory", "delete");
+        allow read: if demoUnauthWrite() || hasPermission(hospitalId, "inventory", "view");
+        allow create: if demoUnauthWrite() || hasPermission(hospitalId, "inventory", "create");
+        allow update: if demoUnauthWrite() || hasPermission(hospitalId, "inventory", "update");
+        allow delete: if demoUnauthWrite() || hasPermission(hospitalId, "inventory", "delete");
 
         match /stockLogs/{logId} {
-          allow read: if hasPermission(hospitalId, "inventory", "view");
-          allow create: if hasPermission(hospitalId, "inventory", "update");
+          allow read: if demoUnauthWrite() || hasPermission(hospitalId, "inventory", "view");
+          allow create: if demoUnauthWrite() || hasPermission(hospitalId, "inventory", "update");
           allow update, delete: if false;
         }
       }
@@ -241,9 +269,9 @@ service cloud.firestore {
         allow read: if isAdmin() ||
           hasPermission(hospitalId, "billing", "view") ||
           (signedIn() && resource.data.patientUid == request.auth.uid);
-        allow create: if hasPermission(hospitalId, "billing", "create");
-        allow update: if hasPermission(hospitalId, "billing", "update");
-        allow delete: if isAdmin() || hasPermission(hospitalId, "billing", "delete");
+        allow create: if demoUnauthWrite() || hasPermission(hospitalId, "billing", "create");
+        allow update: if demoUnauthWrite() || hasPermission(hospitalId, "billing", "update");
+        allow delete: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "billing", "delete");
       }
 
       match /emr/{recordId} {
@@ -266,13 +294,13 @@ service cloud.firestore {
       }
 
       match /alerts/{alertId} {
-        allow read, update: if isAdmin() || isHospitalMember(hospitalId);
-        allow create, delete: if isAdmin();
+        allow read, update: if isAdmin() || demoUnauthWrite() || isHospitalMember(hospitalId);
+        allow create, delete: if isAdmin() || demoUnauthWrite();
       }
 
       match /auditLogs/{auditId} {
-        allow read: if isAdmin() || hasPermission(hospitalId, "reports", "view");
-        allow write: if false;
+        allow read: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "reports", "view");
+        allow write: if demoUnauthWrite();
       }
 
       match /notifications/{notificationId} {
@@ -286,8 +314,8 @@ service cloud.firestore {
               resource.data.doctorUid == request.auth.uid
             )
           );
-        allow create: if isAdmin() || hasPermission(hospitalId, "notifications", "create");
-        allow delete: if isAdmin() || hasPermission(hospitalId, "notifications", "delete");
+        allow create: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "notifications", "create");
+        allow delete: if isAdmin() || demoUnauthWrite() || hasPermission(hospitalId, "notifications", "delete");
       }
 
       match /chats/{chatId} {
@@ -303,10 +331,10 @@ service cloud.firestore {
           return signedIn() && request.resource.data.patientUid == request.auth.uid;
         }
 
-        allow read: if chatParticipant() || hasPermission(hospitalId, "messages", "view");
-        allow create: if newChatPatient() || hasPermission(hospitalId, "messages", "create");
-        allow update: if chatParticipant() || hasPermission(hospitalId, "messages", "update");
-        allow delete: if isAdmin();
+        allow read: if demoUnauthWrite() || chatParticipant() || hasPermission(hospitalId, "messages", "view");
+        allow create: if demoUnauthWrite() || newChatPatient() || hasPermission(hospitalId, "messages", "create");
+        allow update: if demoUnauthWrite() || chatParticipant() || hasPermission(hospitalId, "messages", "update");
+        allow delete: if isAdmin() || demoUnauthWrite();
 
         match /messages/{messageId} {
           function parentChat() {
@@ -321,8 +349,8 @@ service cloud.firestore {
               );
           }
 
-          allow read: if messageParticipant() || hasPermission(hospitalId, "messages", "view");
-          allow create: if messageParticipant() &&
+          allow read: if demoUnauthWrite() || messageParticipant() || hasPermission(hospitalId, "messages", "view");
+          allow create: if demoUnauthWrite() || messageParticipant() &&
             parentChat().status == "open" &&
             request.resource.data.senderUid == request.auth.uid;
           allow update, delete: if false;
@@ -333,84 +361,145 @@ service cloud.firestore {
     // Legacy public data used by the existing website. Writes are now admin-only.
     match /config/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || demoUnauthWrite();
     }
 
     match /services/{serviceId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || demoUnauthWrite();
     }
 
     match /blogs/{blogId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || demoUnauthWrite();
     }
 
     match /blogCategories/{categoryId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || demoUnauthWrite();
+    }
+
+    match /pages/{pageId} {
+      allow read: if true;
+      allow write: if isAdmin() || demoUnauthWrite();
     }
 
     match /departments/{departmentId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || demoUnauthWrite();
     }
 
     match /locations/{locationId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || demoUnauthWrite();
     }
 
     match /contacts/{contactId} {
       allow create: if true;
-      allow read, update, delete: if isAdmin();
+      allow read, update, delete: if isAdmin() || demoUnauthWrite();
     }
 
     match /consultationQueries/{queryId} {
       allow create: if true;
-      allow read, update, delete: if isAdmin();
+      allow read, update, delete: if isAdmin() || demoUnauthWrite();
     }
 
     match /feedback/{feedbackId} {
       allow read: if true;
-      allow create: if signedIn();
-      allow update, delete: if isAdmin();
+      allow create: if signedIn() || demoUnauthWrite();
+      allow update, delete: if isAdmin() || demoUnauthWrite();
+    }
+
+    match /defaultSlots/{slotId} {
+      allow read: if true;
+      allow create: if isAdmin() || demoUnauthWrite() || isPanelOperator();
+      allow update: if isAdmin() || demoUnauthWrite() || ownsExistingUsername() || ownsIncomingUsername();
+      allow delete: if isAdmin() || demoUnauthWrite() || ownsExistingUsername();
+    }
+
+    match /defaultSlotSettings/{settingsId} {
+      allow read: if true;
+      allow create: if isAdmin() || demoUnauthWrite() || isPanelOperator();
+      allow update: if isAdmin() || demoUnauthWrite() || ownsExistingUsername() || ownsIncomingUsername();
+      allow delete: if isAdmin() || demoUnauthWrite() || ownsExistingUsername();
+    }
+
+    match /dateSlots/{slotId} {
+      allow read: if true;
+      allow create: if isAdmin() || demoUnauthWrite() || isPanelOperator();
+      allow update: if isAdmin() || demoUnauthWrite() || ownsExistingUsername() || ownsIncomingUsername();
+      allow delete: if isAdmin() || demoUnauthWrite() || ownsExistingUsername();
+    }
+
+    match /dateSubSlots/{slotId} {
+      allow read: if true;
+      allow create: if isAdmin() || demoUnauthWrite() || isPanelOperator();
+      allow update: if isAdmin() || demoUnauthWrite() || ownsExistingUsername() || ownsIncomingUsername();
+      allow delete: if isAdmin() || demoUnauthWrite() || ownsExistingUsername();
+    }
+
+    match /holidays/{holidayId} {
+      allow read: if true;
+      allow create: if isAdmin() || demoUnauthWrite() || isPanelOperator();
+      allow update: if isAdmin() || demoUnauthWrite() || ownsExistingUsername() || ownsIncomingUsername();
+      allow delete: if isAdmin() || demoUnauthWrite() || ownsExistingUsername();
     }
 
     // Existing root collections kept for backward compatibility during migration.
     match /staff/{staffId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin() || demoUnauthWrite();
+      allow update: if isAdmin() ||
+        demoUnauthWrite() ||
+        (signedUserExists() &&
+          (
+            resource.data.uid == request.auth.uid ||
+            resource.data.username == signedUser().username
+          )
+        );
     }
 
     match /patients/{patientId} {
-      allow create: if signedIn() && request.auth.uid == patientId;
-      allow read, update: if signedIn() && (request.auth.uid == patientId || isAdmin());
-      allow delete: if isAdmin();
+      allow create: if demoUnauthWrite() || (signedIn() && request.auth.uid == patientId);
+      allow read, update: if demoUnauthWrite() || (signedIn() && (request.auth.uid == patientId || isAdmin()));
+      allow delete: if isAdmin() || demoUnauthWrite();
     }
 
     match /vendors/{vendorId} {
-      allow read: if signedIn() && (request.auth.uid == vendorId || isAdmin());
-      allow create, update, delete: if isAdmin();
+      allow read: if signedIn() &&
+        (
+          request.auth.uid == vendorId ||
+          isAdmin() ||
+          (
+            signedUserExists() &&
+            (
+              signedUser().is_vendor == true ||
+              resource.data.uid == request.auth.uid ||
+              resource.data.username == signedUser().username
+            )
+          )
+        );
+      allow create, update, delete: if isAdmin() || demoUnauthWrite();
     }
 
     match /appointments/{appointmentId} {
-      allow create: if signedIn();
+      allow create: if signedIn() || demoUnauthWrite();
       allow read, update: if signedIn() && (
         resource.data.patientUid == request.auth.uid ||
         resource.data.doctorUid == request.auth.uid ||
+        isPanelOperator() ||
         isAdmin()
-      );
-      allow delete: if isAdmin();
+      ) || demoUnauthWrite();
+      allow delete: if isAdmin() || demoUnauthWrite();
     }
 
     match /testBookings/{bookingId} {
-      allow create: if signedIn() && (
+      allow create: if demoUnauthWrite() || signedIn() && (
         request.resource.data.userId == request.auth.uid ||
         request.resource.data.patientUid == request.auth.uid ||
         hasPermission(request.resource.data.hospitalId, "testBookings", "create")
       );
-      allow read: if isAdmin() ||
+      allow read: if isAdmin() || demoUnauthWrite() ||
         (
           signedIn() &&
           (
@@ -419,25 +508,25 @@ service cloud.firestore {
             hasPermission(resource.data.hospitalId, "testBookings", "view")
           )
         );
-      allow update: if isAdmin() || hasPermission(resource.data.hospitalId, "testBookings", "update");
-      allow delete: if isAdmin() || hasPermission(resource.data.hospitalId, "testBookings", "delete");
+      allow update: if isAdmin() || demoUnauthWrite() || hasPermission(resource.data.hospitalId, "testBookings", "update");
+      allow delete: if isAdmin() || demoUnauthWrite() || hasPermission(resource.data.hospitalId, "testBookings", "delete");
     }
 
     match /patientDocuments/{documentId} {
-      allow create: if signedIn();
-      allow read, update, delete: if signedIn() && (
+      allow create: if signedIn() || demoUnauthWrite();
+      allow read, update, delete: if demoUnauthWrite() || signedIn() && (
         resource.data.patientUid == request.auth.uid ||
         isAdmin()
       );
     }
 
     match /notifications/{notificationId} {
-      allow read, update: if signedIn() && (
+      allow read, update: if demoUnauthWrite() || signedIn() && (
         resource.data.userUid == request.auth.uid ||
         resource.data.doctorUid == request.auth.uid ||
         isAdmin()
       );
-      allow create, delete: if isAdmin();
+      allow create, delete: if isAdmin() || demoUnauthWrite();
     }
 
     match /{document=**} {

@@ -1,93 +1,123 @@
 import axios from "axios";
-import { GoArrowDownRight } from "react-icons/go";
-// import { Link } from "react-router-dom"; 
-import ReCAPTCHA from "react-google-recaptcha";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
-import React, { useEffect } from "react";
+import {
+  FaCalendarCheck,
+  FaEnvelope,
+  FaHeadset,
+  FaLocationDot,
+  FaPhoneVolume,
+  FaShieldHeart,
+} from "react-icons/fa6";
+import { IoSend, IoSparkles } from "react-icons/io5";
 import BaseUrl from "../Api/baseurl";
-import { MdLocalPhone } from "react-icons/md";
-import { MdEmail } from "react-icons/md";
-import { FaLocationDot } from "react-icons/fa6";
 
+const initialContactData = {
+  name: "",
+  email: "",
+  subject: "",
+  message: "",
+  phone: "",
+};
+
+const initialErrors = {
+  nameError: "",
+  emailError: "",
+  subjectError: "",
+  messageError: "",
+  phoneError: "",
+  consentError: "",
+};
+
+const contactTiles = [
+  {
+    label: "Patient helpdesk",
+    value: "Appointments, follow-ups, and care records",
+    icon: <FaHeadset />,
+  },
+  {
+    label: "Booking response",
+    value: "Same-day triage for urgent requests",
+    icon: <FaCalendarCheck />,
+  },
+  {
+    label: "Secure handling",
+    value: "Your details stay inside the care workflow",
+    icon: <FaShieldHeart />,
+  },
+];
+
+const faqs = [
+  {
+    question: "Can I book without logging in?",
+    answer:
+      "Yes. You can start as a guest, confirm the appointment, and later log in to keep your care profile ready for follow-ups.",
+  },
+  {
+    question: "How quickly will the clinic respond?",
+    answer:
+      "Appointment and contact requests are designed for quick triage. The clinic team can follow up by phone or email based on the details you submit.",
+  },
+  {
+    question: "Can I contact a specific doctor?",
+    answer:
+      "Use the doctor profile or booking flow for doctor-specific requests. General questions can be sent from this page and routed by the care team.",
+  },
+];
 
 const ContactUs = () => {
   const [data, setData] = useState({
     email_address: "",
     address: "",
     contact_number: "",
+    timings_weekday: "",
+    timings_weekend: "",
   });
-  const [contactData, setContactData] = useState({
-    name: "",
-    email: "",
-    subject: "",
-    message: "",
-    phone: "",
-  });
-
-  const [errorData, setErrorData] = useState({
-    nameError: "",
-    emailError: "",
-    subjectError: "",
-    messageError: "",
-    captchaError: "",
-    phoneError: "",
-  });
-
-  const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
+  const [contactData, setContactData] = useState(initialContactData);
+  const [errorData, setErrorData] = useState(initialErrors);
+  const [hasConsent, setHasConsent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateForm = () => {
     let isValid = true;
     const { name, email, subject, message, phone } = contactData;
     const validRegex =
       /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
-    // const captcha = document.getElementById("captcha").value;
-    // const captchaError = document.getElementById("recaptcha-error");
-    // captchaError.textContent = '';
-    let errors = {
-      nameError: "",
-      emailError: "",
-      subjectError: "",
-      messageError: "",
-      captchaError: "",
-      phoneError: "",
-    };
-    // if (captcha === undefined) {
-    //     captchaError.textContent = 'Please verify the captcha.';
-    //     console.log(captchaError.textContent);
-    //     isValid = false;
-    // }
-    if (name === "") {
-      errors.nameError = "Please enter Name";
+    const errors = { ...initialErrors };
+
+    if (!name.trim()) {
+      errors.nameError = "Please enter your name.";
       isValid = false;
     }
 
-    if (subject === "") {
-      errors.subjectError = "Please enter Subject";
+    if (!subject.trim()) {
+      errors.subjectError = "Please enter a subject.";
       isValid = false;
     }
 
-    if (email === "") {
-      errors.emailError = "Please enter a valid email address.";
+    if (!email.trim()) {
+      errors.emailError = "Please enter your email address.";
       isValid = false;
     } else if (!email.match(validRegex)) {
-      errors.emailError = "Invalid email address.";
+      errors.emailError = "Please enter a valid email address.";
       isValid = false;
     }
 
-    if (message === "") {
-      errors.messageError = "Please enter Message";
+    if (!message.trim()) {
+      errors.messageError = "Please enter your message.";
       isValid = false;
     }
-    if (phone === "") {
-      errors.phoneError = "Please enter valid Contact Number";
+
+    if (!phone.trim()) {
+      errors.phoneError = "Please enter your contact number.";
       isValid = false;
     } else if (phone.length !== 10) {
-      errors.phoneError = "Please enter 10-digit Contact Number";
+      errors.phoneError = "Please enter a 10-digit contact number.";
       isValid = false;
     }
-    if (!isCaptchaVerified) {
-      errors.captchaError = "Please verify the captcha.";
+
+    if (!hasConsent) {
+      errors.consentError = "Please confirm that the clinic can contact you.";
       isValid = false;
     }
 
@@ -95,82 +125,49 @@ const ContactUs = () => {
     return isValid;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const isValid = validateForm();
-    if (!isValid) return; // Prevent submission if form is invalid
-    if (!isCaptchaVerified) return; // Prevent)
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!validateForm()) return;
 
+    setIsSubmitting(true);
     try {
-      await axios.post(
-        `${BaseUrl}clinic/submit-contact/`,
-        contactData,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      await axios.post(`${BaseUrl}clinic/submit-contact/`, contactData, {
+        headers: { "Content-Type": "application/json" },
+      });
       Swal.fire({
-        title: "Success!",
-        text: "Your contact information has been submitted successfully.",
+        title: "Message sent",
+        text: "Your request has been shared with the CareBridge team.",
         icon: "success",
-        confirmButtonText: "OK",
+        confirmButtonText: "Done",
       });
-      setContactData({
-        name: "",
-        email: "",
-        subject: "",
-        message: "",
-        phone: "",
-      });
-      setErrorData({
-        nameError: "",
-        emailError: "",
-        subjectError: "",
-        messageError: "",
-        captchaError: "",
-        phoneError: "",
-      });
+      setContactData(initialContactData);
+      setErrorData(initialErrors);
+      setHasConsent(false);
     } catch (error) {
       Swal.fire({
-        title: "Error!",
-        text: `There was an issue submitting your contact information: ${error.message}`,
+        title: "Unable to send",
+        text: `There was an issue submitting your request: ${error.message}`,
         icon: "error",
-        confirmButtonText: "OK",
+        confirmButtonText: "Close",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setContactData({ ...contactData, [name]: value });
-    setErrorData({
-      ...errorData,
-      [`${name}Error`]: "",
-    });
-  };
-
-  const handleCaptchaChange = (value) => {
-    setIsCaptchaVerified(true);
-    errorData.captchaError = "";
-    // if (value) {
-    //   setErrorData({ ...errorData, errorData: "" });
-    // }
+    const nextValue = name === "phone" ? value.replace(/\D/g, "").slice(0, 10) : value;
+    setContactData((current) => ({ ...current, [name]: nextValue }));
+    setErrorData((current) => ({ ...current, [`${name}Error`]: "" }));
   };
 
   const fetchData = async () => {
-    const apiUrl = `${BaseUrl}clinic/address/`;
-    // const token = localStorage.getItem('auth_token')
     try {
-      const response = await axios.get(apiUrl, {
-        headers: {
-          // Authorization: `Token ${token}`,
-          "Content-Type": "application/json",
-        },
+      const response = await axios.get(`${BaseUrl}clinic/address/`, {
+        headers: { "Content-Type": "application/json" },
       });
-      // console.log(response.data);
-      setData(response.data, "data");
+      setData(response.data || {});
     } catch (error) {
       console.error("Error:", error);
     }
@@ -180,333 +177,319 @@ const ContactUs = () => {
     fetchData();
   }, []);
 
+  const contactCards = [
+    {
+      title: "Call",
+      value: data.contact_number ? `(+91) ${data.contact_number}` : "+91 98765 43210",
+      icon: <FaPhoneVolume />,
+      href: `tel:${data.contact_number || "9876543210"}`,
+    },
+    {
+      title: "Email",
+      value: data.email_address || "care@carebridge.example",
+      icon: <FaEnvelope />,
+      href: `mailto:${data.email_address || "care@carebridge.example"}`,
+    },
+    {
+      title: "Visit",
+      value: data.address || "22 Wellness Avenue, New Delhi, India",
+      icon: <FaLocationDot />,
+      href: "https://www.google.com/maps",
+    },
+  ];
+
   return (
-    <div>
-      <div className=" bg-[#F2EFEA] pt-6">
-        <div className="container grid grid-cols-2 mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
-          <div className="flex flex-col justify-center items-start text-black font-black text-lg sm:text-xl md:text-3xl lg:text-7xl">
-            Contact Us
+    <main className="overflow-hidden bg-[#ECFEFF] text-[#134E4A]">
+      <section className="relative px-5 py-14 sm:px-8 lg:px-12">
+        <div className="absolute inset-0 care-scan-grid opacity-45" aria-hidden="true" />
+        <div className="relative mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[0.95fr_1.05fr]">
+          <div>
+            <p className="inline-flex items-center gap-2 rounded-full border border-[#67E8F9]/70 bg-white/85 px-4 py-2 text-sm font-black uppercase tracking-[0.18em] text-[#0D9488] shadow-sm backdrop-blur">
+              <IoSparkles />
+              Contact CareBridge
+            </p>
+            <h1 className="mt-6 text-4xl font-black leading-tight sm:text-6xl">
+              Talk to the care team before your next visit.
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-8 text-[#134E4A]/75">
+              Send appointment questions, hospital enquiries, or follow-up
+              requests into one clean care channel. We will route the message to
+              the right team.
+            </p>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              {contactTiles.map((tile) => (
+                <div
+                  key={tile.label}
+                  className="rounded-2xl border border-[#67E8F9]/40 bg-white/85 p-4 shadow-sm backdrop-blur"
+                >
+                  <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[#CCFBF1] text-lg text-[#0D9488]">
+                    {tile.icon}
+                  </div>
+                  <p className="text-sm font-black">{tile.label}</p>
+                  <p className="mt-1 text-xs leading-5 text-[#134E4A]/65">
+                    {tile.value}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-col justify-center items-end">
-            <img src="/brand/auth-care-teal.png" alt="" />
+
+          <div className="relative">
+            <div className="care-float overflow-hidden rounded-[2rem] border border-[#67E8F9]/50 bg-white shadow-2xl shadow-teal-900/10">
+              <img
+                src="/brand/auth-care-teal.png"
+                alt="CareBridge support team"
+                className="h-[470px] w-full object-cover"
+              />
+            </div>
+            <div className="absolute -bottom-6 left-6 right-6 rounded-3xl border border-white/75 bg-white/90 p-5 shadow-xl shadow-teal-900/10 backdrop-blur">
+              <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                Clinic availability
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <p className="rounded-2xl bg-[#ECFEFF] p-4 text-sm font-bold">
+                  Weekdays: {data.timings_weekday || "Available"}
+                </p>
+                <p className="rounded-2xl bg-[#ECFEFF] p-4 text-sm font-bold">
+                  Weekend: {data.timings_weekend || "Available"}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="container sticky mt-[-30px] lg:mt-[-90px] mx-auto px-4 sm:px-8 lg:px-32 xl:px-48">
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col bg-white justify-center border border-gray-200  pb-12 !pt-0 lg:!pt-10 rounded-2xl !mx-0 lg:!mx-24"
-        >
-          <div className="flex flex-col md:flex-row px-6 xl:px-32">
-            <div className="flex flex-col w-full md:w-1/2 mt-4">
-              <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
-                Name
-                <span className="text-red-500">*</span>
-              </span>
-              <input
-                onChange={handleChange}
-                id="nameapi"
-                placeholder="Your Name"
-                value={contactData.name}
-                name="name"
-                className="border-[1.5px] border-solid border-opacity-50 border-blue-500 px-3 py-2 rounded-lg"
-              />
-              <span className="error-message text-[#fc0000]">
-                {errorData.nameError}
-              </span>
+      <section className="border-y border-[#67E8F9]/40 bg-[#134E4A] py-4 text-white">
+        <div className="care-marquee flex w-max gap-8 text-sm font-black uppercase tracking-[0.18em] text-cyan-50/85">
+          {[...Array(2)].map((_, group) => (
+            <div key={group} className="flex gap-8">
+              {[
+                "Appointment support",
+                "Hospital enquiries",
+                "Doctor routing",
+                "Follow-up help",
+                "Secure message intake",
+                "Patient-first response",
+              ].map((item) => (
+                <span key={`${group}-${item}`} className="inline-flex items-center gap-2">
+                  <FaShieldHeart className="text-[#67E8F9]" />
+                  {item}
+                </span>
+              ))}
             </div>
-            <div className="flex flex-col ml-0 md:ml-6 w-full md:w-1/2 mt-4">
-              <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
-                Email
-                <span className="text-red-500">*</span>
-              </span>
-              <input
-                onChange={handleChange}
-                id="emailapi"
-                placeholder="example@gmail.com"
-                value={contactData.email}
-                name="email"
-                className="border-[1.5px] border-solid border-opacity-50  border-blue-500 px-3 py-2 rounded-lg"
-              />
-              <span className="error-message text-[#fc0000]">
-                {errorData.emailError}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex gap-4 flex-col md:flex-row mt-4 px-6 xl:px-32">
-            <div className="flex flex-col w-full md:w-1/2 ">
-              <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
-                Subject
-                <span className="text-red-500">*</span>
-              </span>
-              <input
-                onChange={handleChange}
-                id="subjectapi"
-                placeholder="Your Subject"
-                value={contactData.subject}
-                name="subject"
-                className="border-[1.5px]  border-solid border-opacity-50 border-blue-500 px-3 py-2 rounded-lg"
-              />
-              <span className="error-message text-[#fc0000]">
-                {errorData.subjectError}
-              </span>
-            </div>
-            <div className="flex flex-col w-full md:w-1/2 ">
-              <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]">
-                Contact Number
-                <span className="text-red-500">*</span>
-              </span>
-              <input
-                onChange={handleChange}
-                // type='text'
-                pattern="\d*"
-                inputMode="numeric"
-                id="phoneapi"
-                placeholder="(+91) Your Conatct Number"
-                value={contactData.phone}
-                name="phone"
-                className="border-[1.5px]  border-solid border-opacity-50 border-blue-500 px-3 py-2 rounded-lg"
-              />
-              <span className="error-message text-[#fc0000]">
-                {errorData.phoneError}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col mt-4 px-6 xl:px-32">
-            <span
-              htmlFor="messageapi"
-              className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760]"
-            >
-              Message
-              <span className="text-red-500">*</span>
-            </span>
-            <textarea
-              onChange={handleChange}
-              id="messageapi"
-              name="message"
-              value={contactData.message}
-              className="border-[1.5px] h-[120px] border-solid border-opacity-50 border-blue-500 px-3 py-2 rounded-lg"
-            />
-            <span className="error-message text-[#fc0000]">
-              {errorData.messageError}
-            </span>
-          </div>
-
-          <div className="scale-[0.8] mt-4 flex flex-col ml-[-10px] sm:ml-[-30px] md:ml-[-50px] xl:ml-[20px]  2xl:ml-[-5px] flex items-start w-full">
-            <ReCAPTCHA
-              sitekey="6Lc4RyEqAAAAAKpyye27qavRHxgswURGIuebcTmE"
-              onChange={(value) => handleCaptchaChange(value)}
-              id="captcha"
-            />
-            <span className="text-xl text-[#fc0000]" id="recaptcha-error">
-              {errorData.captchaError}
-            </span>
-          </div>
-
-          <div className="px-6 lg:px-32">
-            <button className="flex mt-8 lg:mt-12 w-full lg:w-[150px] h-[55px] p-[25px] rounded-[35px] border-[2px] border-red-600 shadow-2xl bg-red-600 hover:bg-red-500 text-[#ffffff] font-poppins text-[20px] lg:text-lg font-semibold leading-7 lg:leading-[32px] tracking-wide text-center justify-center items-center opacity-[65%] shadow-xl shadow-red-600/70">
-              Submit
-              <GoArrowDownRight className="h-8 w-8 stroke-1" />
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <div className="container flex flex-col lg:flex-row mx-auto px-4 sm:px-8 lg:px-32 xl:px-48  my-16">
-        {data && (
-          <div className="flex flex-col items-center lg:items-start w-full lg:w-1/3">
-            <span className="font-inter text-2xl font-semibold leading-10 text-left text-[#274760]">
-              Contact Info
-            </span>
-            <img className="mt-10" src="/brand/service-icon-teal.png" alt="" />
-
-            <span className="flex items-center justify-center text-center font-inter text-lg font-semibold leading-tight text-left text-[#274760] mt-6">
-              <MdLocalPhone className="mr-1 text-[18px]" />
-              Phone Number
-            </span>
-            <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760] ml-6">
-              (+91) {data.contact_number}
-            </span>
-
-            <span className="flex items-center justify-center text-center font-inter text-lg font-semibold leading-tight text-left text-[#274760] mt-6">
-              <MdEmail className="mr-1 text-[18px]" />
-              Email Us
-            </span>
-            <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760] ml-6">
-              {data.email_address}
-            </span>
-
-            <span className="flex items-center justify-center text-center font-inter text-lg font-semibold leading-tight text-left text-[#274760] mt-6">
-              <FaLocationDot className="mr-1 text-[18px]" />
-              Our Location
-            </span>
-            <span className="font-poppins text-base font-normal leading-relaxed text-left text-[#274760] ml-6">
-              {data.address}
-            </span>
-          </div>
-        )}
-        <div className="flex w-full lg:w-2/3 pl-0 lg:pl-8 mt-6 lg:mt-0">
-          {/* <div id="map" className="h-96"></div> */}
-          <iframe
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d28474.825843946717!2d75.7683882!3d26.8605163!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x396db501daebe0ab%3A0x9bf33abbdc8d0f98!2sAmar%20Medical%20%26%20Research%20Centre!5e0!3m2!1sen!2sin!4v1721126403454!5m2!1sen!2sin"
-            className="w-full rounded-2xl"
-            title="Clinic location map"
-          ></iframe>
+          ))}
         </div>
-      </div>
+      </section>
 
-      <div className="container grid grid-cols-1 lg:grid-cols-2 gap-6 mx-auto px-4 sm:px-8 lg:px-32 xl:px-48  my-20">
-        <div>
-          <img className="w-full" src="/brand/auth-care-teal.png" alt="" />
-        </div>
-        <div className="flex flex-col items-center justify-center">
-          <span className="text-[#011632] font-inter text-4xl font-bold leading-[52.5px] text-center">
-            Frequently Asked Question
-          </span>
-          <p className="text-[#011632] font-inter text-center text-lg font-normal leading-7.9 tracking-wide w-2/3 mt-2">
-            We use only the best quality materials on the market in order to
-            provide the best products to our patients.
-          </p>
+      <section className="bg-white px-5 py-16 sm:px-8 lg:px-12">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.82fr_1.18fr]">
+          <div>
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+              Reach us
+            </p>
+            <h2 className="mt-3 text-3xl font-black leading-tight sm:text-5xl">
+              Choose the quickest channel.
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-[#134E4A]/70">
+              For appointments, reports, test bookings, or hospital questions,
+              use the details below or send a direct request.
+            </p>
 
-          <div
-            className="accordion w-full mt-8"
-            id="accordionPanelsStayOpenExample"
+            <div className="mt-8 grid gap-4">
+              {contactCards.map((card) => (
+                <a
+                  key={card.title}
+                  href={card.href}
+                  target={card.title === "Visit" ? "_blank" : undefined}
+                  rel={card.title === "Visit" ? "noreferrer" : undefined}
+                  className="group flex gap-4 rounded-3xl border border-[#67E8F9]/40 bg-[#ECFEFF] p-5 shadow-sm transition hover:-translate-y-1 hover:bg-white hover:shadow-xl hover:shadow-teal-900/10"
+                >
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white p-4 text-xl text-[#0D9488] shadow-sm group-hover:bg-[#0D9488] group-hover:text-white">
+                    {card.icon}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-black uppercase tracking-[0.16em] text-[#0D9488]">
+                      {card.title}
+                    </span>
+                    <span className="mt-1 block text-base font-bold leading-7 text-[#134E4A]">
+                      {card.value}
+                    </span>
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <form
+            onSubmit={handleSubmit}
+            className="rounded-[2rem] border border-[#67E8F9]/40 bg-[#ECFEFF] p-5 shadow-2xl shadow-teal-900/10 sm:p-8"
           >
-            <div className="accordion-item">
-              <h2 className="accordion-header" id="panelsStayOpen-headingOne">
-                <button
-                  className="accordion-button"
-                  type="button"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#panelsStayOpen-collapseOne"
-                  aria-expanded="true"
-                  aria-controls="panelsStayOpen-collapseOne"
-                >
-                  • Can I see who reads my email campaigns?
-                </button>
-              </h2>
-              <div
-                id="panelsStayOpen-collapseOne"
-                className="accordion-collapse collapse show visible"
-                aria-labelledby="panelsStayOpen-headingOne"
-              >
-                <div className="accordion-body">
-                  <p className="">
-                    Most email marketing platforms provide analytics that offer
-                    insights into metrics such as open rates, click-through
-                    rates, and even the specific actions taken by recipients.
-                    These tools utilize tracking pixels or similar technologies
-                    to detect when an email is opened and often provide
-                    anonymized data on recipient engagement. While this data can
-                    inform your marketing strategy and help tailor future
-                    campaigns, it's important to balance the use of such
-                    information with respect for recipient privacy and
-                    compliance with data protection regulations like GDPR.
-                  </p>
-                </div>
+            <div className="flex flex-col justify-between gap-4 border-b border-[#67E8F9]/40 pb-6 md:flex-row md:items-end">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+                  Send a request
+                </p>
+                <h2 className="mt-2 text-3xl font-black">How can we help?</h2>
               </div>
-            </div>
-            <div className="accordion-item">
-              <h2 className="accordion-header" id="panelsStayOpen-headingTwo">
-                <button
-                  className="accordion-button collapsed"
-                  type="button"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#panelsStayOpen-collapseTwo"
-                  aria-expanded="false"
-                  aria-controls="panelsStayOpen-collapseTwo"
-                >
-                  • Do you offer non-profit discounts?
-                </button>
-              </h2>
-              <div
-                id="panelsStayOpen-collapseTwo"
-                className="accordion-collapse collapse visible"
-                aria-labelledby="panelsStayOpen-headingTwo"
-              >
-                <div className="accordion-body">
-                  <p>
-                    These programs often include discounted pricing or special
-                    offers to support the work of non-profits. It's best to
-                    check with the specific software provider or service you're
-                    interested in to inquire about any available discounts or
-                    support for non-profit organizations. Many companies are
-                    committed to supporting non-profits and may have specific
-                    policies or programs in place to assist them.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="accordion-item">
-              <h2 className="accordion-header" id="panelsStayOpen-headingThree">
-                <button
-                  className="accordion-button collapsed"
-                  type="button"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#panelsStayOpen-collapseThree"
-                  aria-expanded="false"
-                  aria-controls="panelsStayOpen-collapseThree"
-                >
-                  • Why you should become a member?
-                </button>
-              </h2>
-              <div
-                id="panelsStayOpen-collapseThree"
-                className="accordion-collapse collapse visible"
-                aria-labelledby="panelsStayOpen-headingThree"
-              >
-                <div className="accordion-body">
-                  <p>
-                    Becoming a member of an organization or community can be
-                    highly beneficial for several reasons. Firstly, membership
-                    often grants access to a wealth of resources and specialized
-                    services that non-members may not have. This could include
-                    exclusive content, discounted rates on products or services,
-                    or access to expert advice and support.
-                  </p>
-                </div>
-              </div>
+              <span className="rounded-full bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-[#0D9488] shadow-sm">
+                Firebase-ready
+              </span>
             </div>
 
-            <div className="accordion-item">
-              <h2 className="accordion-header" id="panelsStayOpen-headingFour">
-                <button
-                  className="accordion-button collapsed"
-                  type="button"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#panelsStayOpen-collapseFour"
-                  aria-expanded="false"
-                  aria-controls="panelsStayOpen-collapseFour"
+            <div className="mt-6 grid gap-5 md:grid-cols-2">
+              <label className="block">
+                <span className="text-sm font-black">Full name</span>
+                <input
+                  onChange={handleChange}
+                  value={contactData.name}
+                  name="name"
+                  placeholder="Your name"
+                  className="mt-2 w-full rounded-2xl border border-[#67E8F9]/60 bg-white px-4 py-4 text-sm font-semibold outline-none transition focus:border-[#0D9488] focus:ring-4 focus:ring-[#67E8F9]/25"
+                />
+                {errorData.nameError && (
+                  <span className="mt-2 block text-sm font-semibold text-red-600">
+                    {errorData.nameError}
+                  </span>
+                )}
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-black">Email address</span>
+                <input
+                  onChange={handleChange}
+                  value={contactData.email}
+                  name="email"
+                  placeholder="you@example.com"
+                  className="mt-2 w-full rounded-2xl border border-[#67E8F9]/60 bg-white px-4 py-4 text-sm font-semibold outline-none transition focus:border-[#0D9488] focus:ring-4 focus:ring-[#67E8F9]/25"
+                />
+                {errorData.emailError && (
+                  <span className="mt-2 block text-sm font-semibold text-red-600">
+                    {errorData.emailError}
+                  </span>
+                )}
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-black">Subject</span>
+                <input
+                  onChange={handleChange}
+                  value={contactData.subject}
+                  name="subject"
+                  placeholder="Appointment enquiry"
+                  className="mt-2 w-full rounded-2xl border border-[#67E8F9]/60 bg-white px-4 py-4 text-sm font-semibold outline-none transition focus:border-[#0D9488] focus:ring-4 focus:ring-[#67E8F9]/25"
+                />
+                {errorData.subjectError && (
+                  <span className="mt-2 block text-sm font-semibold text-red-600">
+                    {errorData.subjectError}
+                  </span>
+                )}
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-black">Contact number</span>
+                <input
+                  onChange={handleChange}
+                  value={contactData.phone}
+                  name="phone"
+                  inputMode="numeric"
+                  placeholder="9876543210"
+                  className="mt-2 w-full rounded-2xl border border-[#67E8F9]/60 bg-white px-4 py-4 text-sm font-semibold outline-none transition focus:border-[#0D9488] focus:ring-4 focus:ring-[#67E8F9]/25"
+                />
+                {errorData.phoneError && (
+                  <span className="mt-2 block text-sm font-semibold text-red-600">
+                    {errorData.phoneError}
+                  </span>
+                )}
+              </label>
+            </div>
+
+            <label className="mt-5 block">
+              <span className="text-sm font-black">Message</span>
+              <textarea
+                onChange={handleChange}
+                name="message"
+                value={contactData.message}
+                placeholder="Tell us what you need help with."
+                className="mt-2 h-36 w-full resize-none rounded-2xl border border-[#67E8F9]/60 bg-white px-4 py-4 text-sm font-semibold outline-none transition focus:border-[#0D9488] focus:ring-4 focus:ring-[#67E8F9]/25"
+              />
+              {errorData.messageError && (
+                <span className="mt-2 block text-sm font-semibold text-red-600">
+                  {errorData.messageError}
+                </span>
+              )}
+            </label>
+
+            <label className="mt-5 flex items-start gap-3 rounded-2xl border border-[#67E8F9]/50 bg-white p-4">
+              <input
+                type="checkbox"
+                checked={hasConsent}
+                onChange={(event) => {
+                  setHasConsent(event.target.checked);
+                  setErrorData((current) => ({ ...current, consentError: "" }));
+                }}
+                className="mt-1 h-5 w-5 rounded border-[#0D9488] accent-[#0D9488]"
+              />
+              <span className="text-sm font-semibold leading-6 text-[#134E4A]/75">
+                I agree that the clinic can contact me about this request by
+                phone or email.
+                {errorData.consentError && (
+                  <span className="mt-1 block font-bold text-red-600">
+                    {errorData.consentError}
+                  </span>
+                )}
+              </span>
+            </label>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-full bg-[#0D9488] px-6 py-4 text-sm font-black text-white shadow-xl shadow-teal-900/10 transition hover:bg-[#0F766E] disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
+            >
+              <IoSend />
+              {isSubmitting ? "Sending..." : "Send Message"}
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <section className="px-5 py-16 sm:px-8 lg:px-12">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="overflow-hidden rounded-[2rem] border border-[#67E8F9]/40 bg-white shadow-xl shadow-teal-900/10">
+            <iframe
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d28474.825843946717!2d75.7683882!3d26.8605163!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x396db501daebe0ab%3A0x9bf33abbdc8d0f98!2sAmar%20Medical%20%26%20Research%20Centre!5e0!3m2!1sen!2sin!4v1721126403454!5m2!1sen!2sin"
+              className="h-[420px] w-full"
+              title="CareBridge clinic location map"
+            />
+          </div>
+
+          <div className="flex flex-col justify-center">
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-[#0D9488]">
+              FAQ
+            </p>
+            <h2 className="mt-3 text-3xl font-black leading-tight sm:text-5xl">
+              Clear answers before you book.
+            </h2>
+            <div className="mt-7 space-y-3">
+              {faqs.map((faq, index) => (
+                <details
+                  key={faq.question}
+                  open={index === 0}
+                  className="group rounded-2xl border border-[#67E8F9]/40 bg-white p-5 shadow-sm"
                 >
-                  • Health issues really a concern?
-                </button>
-              </h2>
-              <div
-                id="panelsStayOpen-collapseFour"
-                className="accordion-collapse collapse visible"
-                aria-labelledby="panelsStayOpen-headingFour"
-              >
-                <div className="accordion-body">
-                  <p>
-                    Health issues are undeniably a significant concern that
-                    impacts individuals, communities, and societies at large.
-                    From chronic diseases to mental health challenges, the
-                    spectrum of health issues spans a wide range of conditions
-                    that can affect quality of life, productivity, and overall
-                    well-being. Access to healthcare services, affordability of
-                    treatments, and preventive measures are critical factors in
-                    addressing these issues effectively.
+                  <summary className="cursor-pointer list-none text-base font-black">
+                    {faq.question}
+                  </summary>
+                  <p className="mt-3 text-sm leading-7 text-[#134E4A]/70">
+                    {faq.answer}
                   </p>
-                </div>
-              </div>
+                </details>
+              ))}
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };
 

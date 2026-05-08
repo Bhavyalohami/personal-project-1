@@ -68,6 +68,11 @@ service firebase.storage {
       allow write: if isAdmin();
     }
 
+    match /legacy-uploads/{allPaths=**} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+
     match /hospitals/{hospitalId}/public/{allPaths=**} {
       allow read: if true;
       allow write: if isAdmin() || hasPermission(hospitalId, "hospital", "update");

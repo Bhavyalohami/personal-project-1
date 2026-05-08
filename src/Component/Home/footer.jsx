@@ -161,7 +161,7 @@ const Footer = () => {
                 ["About", "/about"],
                 ["Services", "/services"],
                 ["Blog", "/blog"],
-                ["Contact", "/contactus"],
+                ["Contact", "/contact"],
                 ["Doctors", "/ourdoctors"],
               ].map(([label, href]) => (
                 <Link key={href} to={href} className="hover:text-[#67E8F9]">
